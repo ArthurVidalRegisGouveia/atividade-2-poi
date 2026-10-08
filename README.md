@@ -569,6 +569,141 @@ Também verificam `fsync` habilitado/desabilitado, limites e diretório configur
 Os hashes das duas aplicações anteriores permaneceram idênticos.
 Apenas o aviso conhecido do Starlette sobre HTTPX foi emitido.
 
+## Geração de carga CPU-bound com Locust no Windows
+
+O gerador é separado das APIs e deve executar no Windows contra a VM.
+Instale a dependência opcional somente no ambiente virtual local. A versão
+do Locust está fixada em `requirements-carga.txt`; ela não precisa ser instalada
+no Ubuntu. A preparação foi validada com Python 3.14.3 e Locust 2.46.7.
+
+```powershell
+Set-Location D:\atividade-2-poi
+New-Item -ItemType Directory -Path .temp -Force | Out-Null
+$env:TEMP = 'D:\atividade-2-poi\.temp'
+$env:TMP = $env:TEMP
+```
+
+Para instalar e conferir, use os comandos abaixo (não há instalação global):
+
+```powershell
+.\.venv\Scripts\python.exe -m pip install -r requirements-carga.txt --no-cache-dir
+.\.venv\Scripts\python.exe -m pip check
+.\.venv\Scripts\python.exe -m locust --version
+```
+
+O script `scripts/carga/locustfile.py` contém apenas uma tarefa: `GET /primos`.
+`--limite` é fixo por execução (padrão 100000); mantenha exatamente o mesmo
+valor em todos os cenários comparados e confirme o teto `CPU_LIMITE_MAX` da VM.
+Não há cálculo de primos no gerador. HTTP diferente de 200, JSON inválido ou
+resposta incompatível são registrados como falha; a validação não recalcula
+a quantidade de primos. O timeout HTTP é 30 s e também pode influenciar falhas
+sob saturação: registre e mantenha esse valor ao comparar execuções.
+
+A política é de **modelo fechado**: cada usuário mantém no máximo uma
+requisição pendente e espera `--espera` segundos fixos após a tarefa (padrão 1 s).
+O valor 0 remove essa pausa e deve ser calibrado antes de uso. Essa espera está
+somente no cliente Locust. A aplicação mantém seu processamento real de CPU.
+`--taxa` é a taxa de inicialização de usuários/s, não uma taxa de chegada HTTP
+independente. A vazão resulta da concorrência, do tempo de resposta e da espera.
+Não há seleção aleatória de tarefas ou entradas: parâmetros são reproduzíveis,
+mas agendamento, rede e estado da VM impedem tempos idênticos.
+
+Os cenários planejados são:
+
+| Cenário | vCPUs | RAM | Workers Uvicorn |
+|---|---:|---:|---:|
+| C1 | 1 | 1 GiB | 1 |
+| C2 | 1 | 2 GiB | 1 |
+| C3 | 2 | 1 GiB | 2 |
+| C4 | 2 | 2 GiB | 2 |
+
+O gerador **não altera nem verifica automaticamente** o provisionamento.
+Confirme a configuração no VirtualBox e na VM antes de atribuir um cenário.
+Na VM, use `python -m uvicorn apps.cpu_bound.main:app --host 0.0.0.0 --port 8001
+--workers 1` em C1/C2 e `--workers 2` em C3/C4, sem `--reload`.
+
+O executor realiza apenas uma combinação cenário/demanda/repetição por chamada,
+sem percorrer automaticamente os níveis preliminares 1, 5, 10, 20 e 40.
+Ele primeiro executa aquecimento e depois medição em dois processos Locust
+sequenciais. A VM permanece ligada e aquecida, mas as conexões HTTP são recriadas.
+Os CSV de aquecimento ficam separados e não devem entrar nas médias finais.
+
+As durações são segundos contados desde o início de cada fase e **incluem a
+rampa de usuários**. Ambas devem exceder `usuarios/taxa`; escolha períodos
+de regime estável bem maiores que a rampa para os experimentos definitivos.
+`--reset-stats` reinicia os acumulados ao concluir a inicialização dos usuários
+em cada fase. Isso não elimina linhas anteriores já escritas no CSV histórico:
+descarte a rampa ao analisar séries temporais (confira `User Count` e o console).
+Requisições que cruzam a fronteira podem ser contabilizadas depois do reset.
+O encerramento permite até 35 s para tarefas pendentes; pode ultrapassar a
+duração nominal e influenciar os acumulados. O tempo de parede efetivo de cada
+processo é registrado. Esses limites impedem tratar o resumo como uma janela
+estritamente recortada; defina a janela de análise antes da coleta definitiva.
+
+Para preparar um plano **sem enviar HTTP**, use uma repetição reservada:
+
+```powershell
+.\.venv\Scripts\python.exe scripts/carga/executar_locust.py --cenario C1 --usuarios 1 --taxa 1 --duracao 15 --aquecimento 5 --limite 100000 --espera 1 --repeticao 99 --somente-preparar
+```
+
+Exemplo de **piloto de baixa intensidade**, para executar posteriormente após
+confirmar a disponibilidade da VM (não foi executado na preparação):
+
+```powershell
+.\.venv\Scripts\python.exe scripts/carga/executar_locust.py --url http://127.0.0.1:8001 --cenario C1 --usuarios 1 --taxa 1 --duracao 15 --aquecimento 5 --limite 100000 --espera 1 --repeticao 1
+```
+
+Cada chamada cria `experimentos/resultados/carga/C1/usuarios_01/repeticao_01/`.
+A pasta não pode existir previamente: nenhuma execução sobrescreve resultados
+ou planos. Use outro número para uma nova repetição. `parametros.json` registra
+URL, limite, usuários, espera, taxa, duração, aquecimento, cenário planejado,
+repetição, versões Python/Locust, comandos, horários UTC, tempos e códigos de
+saída. As fases geram `aquecimento_*` e `medicao_*`:
+
+- `*_stats.csv`: contagem de requisições/falhas, vazão, tempos médios/mínimos/
+  máximos e percentis de latência; sucessos = requisições menos falhas.
+- `*_stats_history.csv`: evolução periódica da vazão, percentis e usuários.
+- `*_failures.csv` e `*_exceptions.csv` (quando gerado): detalhes dos problemas.
+- `*_console.txt`: saída do Locust para auditoria.
+
+CSV contém agregados e percentis aproximados em milissegundos, não os tempos
+individuais de todas as requisições. Falhas no aquecimento interrompem o executor
+antes da medição. Registros interrompidos ou com falhas devem ser examinados,
+não incorporados silenciosamente às médias. Para execução direta sem interface:
+
+```powershell
+.\.venv\Scripts\python.exe -m locust -f scripts/carga/locustfile.py --headless --host http://127.0.0.1:8001 --users 1 --spawn-rate 1 --run-time 15s --limite 100000 --espera 1 --csv .temp/piloto --csv-full-history
+```
+
+A execução direta é útil para diagnóstico, mas não registra cenário/repetição
+nem separa aquecimento; prefira o executor para experimentos. Verifique que
+não existem configurações `locust.conf` ou variáveis `LOCUST_*` inesperadas.
+Antes dos ensaios definitivos, calibre a demanda gradualmente, mantenha o limite
+e a espera constantes, confirme os workers e recursos efetivos e monitore CPU,
+RAM e swap da VM e do Windows. Registre versões do servidor e gerador (por
+exemplo `pip freeze`), modo de rede do VirtualBox, intervalo entre execuções e
+processos concorrentes. Evite que o gerador ou outras atividades no host se
+tornem o gargalo; planeje aquecimento, duração estável e repetições comparáveis.
+Revise os novos resultados antes de publicá-los: URLs e mensagens podem conter
+informações locais. Não houve execução de carga contra a VM nesta preparação.
+
+Os testes do gerador usam respostas simuladas e processos isolados, sem tráfego
+para a VM. Sem a dependência opcional instalada, somente o teste que carrega
+Locust é omitido; instale `requirements-carga.txt` para validar toda a suíte.
+Na preparação, 115 testes passaram (101 anteriores e 14 novos), sem geração
+de carga. Houve o aviso conhecido de descontinuação do HTTPX no Starlette e
+um aviso de gravação do cache local do pytest; ambos sem falhas.
+Execute a suíte com temporários em D: e uma pasta inédita para preservar
+temporários anteriores:
+
+```powershell
+$pastaTestes = 'D:\atividade-2-poi\.temp\pytest_carga_' + [guid]::NewGuid().ToString('N')
+.\.venv\Scripts\python.exe -m pytest -q --basetemp=$pastaTestes
+```
+
+Referências: [configuração e exportação CSV do Locust](https://docs.locust.io/en/stable/configuration.html)
+e [tarefas e política de espera](https://docs.locust.io/en/stable/writing-a-locustfile.html).
+
 ## Versionamento e publicação
 
 Versione código, testes, scripts, documentação e as cópias revisadas dos resultados
@@ -617,8 +752,11 @@ apps/
 tests/test_cpu.py
 tests/test_memory.py
 tests/test_io.py
+tests/test_carga.py
 scripts/
   carga/.gitkeep
+  carga/locustfile.py
+  carga/executar_locust.py
   monitoramento/.gitkeep
   monitoramento/verificar_memoria_windows.py
   monitoramento/verificar_io_windows.py
@@ -632,6 +770,7 @@ docs/validacao_memory_windows.md
 docs/validacao_io_windows.md
 docs/preparacao_repositorio.md
 requirements.txt
+requirements-carga.txt
 .gitignore
 .gitattributes
 README.md
