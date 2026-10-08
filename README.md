@@ -653,7 +653,7 @@ confirmar a disponibilidade da VM (não foi executado na preparação):
 .\.venv\Scripts\python.exe scripts/carga/executar_locust.py --url http://127.0.0.1:8001 --cenario C1 --usuarios 1 --taxa 1 --duracao 15 --aquecimento 5 --limite 100000 --espera 1 --repeticao 1
 ```
 
-Cada chamada cria `experimentos/resultados/carga/C1/usuarios_01/repeticao_01/`.
+Cada chamada CPU cria `experimentos/resultados/carga/cpu/C1/usuarios_01/repeticao_01/`.
 A pasta não pode existir previamente: nenhuma execução sobrescreve resultados
 ou planos. Use outro número para uma nova repetição. `parametros.json` registra
 URL, limite, usuários, espera, taxa, duração, aquecimento, cenário planejado,
@@ -666,8 +666,9 @@ saída. As fases geram `aquecimento_*` e `medicao_*`:
 - `*_failures.csv` e `*_exceptions.csv` (quando gerado): detalhes dos problemas.
 - `*_console.txt`: saída do Locust para auditoria.
 
-CSV contém agregados e percentis aproximados em milissegundos, não os tempos
-individuais de todas as requisições. Falhas no aquecimento interrompem o executor
+Os CSV nativos Locust contêm agregados e percentis aproximados em milissegundos.
+O executor também gera `medicao_latencias.csv` com tempos individuais da medição.
+Falhas no aquecimento interrompem o executor
 antes da medição. Registros interrompidos ou com falhas devem ser examinados,
 não incorporados silenciosamente às médias. Para execução direta sem interface:
 
@@ -766,7 +767,7 @@ não informe credenciais ou dados pessoais. Os recursos planejados do cenário
 ficam nos metadados, junto com CPUs lógicas e RAM total observadas; confirme
 manualmente se a configuração efetiva corresponde ao cenário.
 
-Saída: `experimentos/resultados/carga/C1/usuarios_01/repeticao_01/monitoramento_linux/`.
+Saída CPU nova: `experimentos/resultados/carga/cpu/C1/usuarios_01/repeticao_01/monitoramento_linux/`.
 Essa subpasta pode coexistir com os arquivos Locust da mesma repetição, mas
 uma coleta preexistente nunca é sobrescrita. Para nova coleta, escolha outra
 repetição ou outra raiz de resultados. Não aponte o executor Locust no Windows
@@ -781,9 +782,9 @@ o diretório permanece gravável. Falhas de leitura de um descendente são
 registradas em `erro`; não viram zeros inventados. Confira após a execução:
 
 ```bash
-head -n 3 experimentos/resultados/carga/C1/usuarios_01/repeticao_01/monitoramento_linux/sistema.csv
-wc -l experimentos/resultados/carga/C1/usuarios_01/repeticao_01/monitoramento_linux/processos.csv
-cat experimentos/resultados/carga/C1/usuarios_01/repeticao_01/monitoramento_linux/metadados.json
+head -n 3 experimentos/resultados/carga/cpu/C1/usuarios_01/repeticao_01/monitoramento_linux/sistema.csv
+wc -l experimentos/resultados/carga/cpu/C1/usuarios_01/repeticao_01/monitoramento_linux/processos.csv
+cat experimentos/resultados/carga/cpu/C1/usuarios_01/repeticao_01/monitoramento_linux/metadados.json
 ```
 
 Interpretação das métricas:
@@ -1153,7 +1154,7 @@ Copie os arquivos de monitoramento da VM para a pasta da mesma repetição no
 Windows, sem substituir arquivos preexistentes. Para consolidar em pasta nova:
 
 ```powershell
-.\.venv\Scripts\python.exe scripts/analise/consolidar_resultados.py experimentos/resultados/carga/C4/usuarios_02/repeticao_100 --saida experimentos/resultados/analise/definitivos_C4_r100
+.\.venv\Scripts\python.exe scripts/analise/consolidar_resultados.py experimentos/resultados/carga/cpu/C4/usuarios_02/repeticao_100 --saida experimentos/resultados/analise/definitivos_C4_r100
 ```
 
 A análise preserva todos os originais. Para eventos completos usa os marcos UTC
@@ -1185,6 +1186,198 @@ global mais de 5 pontos abaixo da árvore. Esses limiares são diagnósticos, n�
 uma correção nem prova de causa. A CPU global permanece a métrica original
 psutil; não é substituída pela CPU dos processos. CSV antigos e contadores
 ausentes continuam aceitos, com avisos e campos indisponíveis.
+
+## Experimentos nas três aplicações
+
+O executor aceita `--aplicacao cpu|memoria|io` (padrão `cpu`). Sem `--url`, escolhe
+`http://127.0.0.1:8001`, `:8002` ou `:8003`. Novas execuções e monitoramentos usam
+`experimentos/resultados/carga/<aplicacao>/<cenario>/usuarios_NN/repeticao_NN/`.
+Os caminhos históricos sem aplicação permanecem intactos e são interpretados
+como CPU pelo consolidador. A identificação inclui aplicação: é possível consolidar
+CPU, memória e I/O com os mesmos cenário/demanda/repetição sem confundi-los.
+
+### Endpoints e configuração real
+
+| Aplicação | GET e parâmetros HTTP | Configuração inicial do servidor |
+|---|---|---|
+| cpu | `/primos?limite=100000`; 1 até `CPU_LIMITE_MAX` | `CPU_LIMITE_MAX=1000000`; `CPU_DIAGNOSTICO=0` |
+| memoria | `/memoria?tamanho_mb=50`; MiB entre os limites | `MEMORY_LIMITE_MIN_MB=1`, `MEMORY_LIMITE_MAX_MB=64`, `MEMORY_MAX_SIMULTANEAS=4`, `MEMORY_RETENCAO_SEGUNDOS=0` |
+| io | `/arquivo?tamanho_mb=10&operacoes=1`; MiB 1–32, operações 1–5 com configuração inicial | `IO_TAMANHO_MAX_MB=32`, `IO_OPERACOES_MAX=5`, `IO_MAX_SIMULTANEAS=2`, `IO_FSYNC=0`, `IO_DIRETORIO_TEMP=.temp/io_bound` |
+
+Todas têm `/health`. Retenção é de 0 a 5 segundos, após escrita/verificação da
+memória. Memória admite máximo × simultâneas ≤ 256 MiB **por worker**. I/O admite
+máximo × simultâneas ≤ 128 MiB por worker e máximo × operações máximas ≤ 160 MiB
+escritos por pedido. Esses orçamentos são multiplicados pelo número de workers.
+Limites de concorrência podem gerar HTTP 503; devem ser registrados como falhas,
+sem ocultá-los por retentativas. A retenção influencia a latência deliberadamente.
+
+`--tamanho-mb` escolhe alocação/arquivo e `--operacoes` só vale para I/O.
+`--retencao-segundos` e `--fsync` são **declarações da configuração na VM**:
+não são query parameters e não configuram o servidor remoto. Configure suas
+variáveis de ambiente antes de iniciar/reiniciar Uvicorn. Para limites diferentes,
+`--config-servidor arquivo.json` aceita um objeto com as variáveis do perfil
+acima, completa as demais com os padrões e valida os orçamentos antes da carga.
+Não aceita chaves desconhecidas. Por exemplo, para I/O:
+
+```json
+{"IO_TAMANHO_MAX_MB": 16, "IO_OPERACOES_MAX": 5, "IO_MAX_SIMULTANEAS": 2,
+ "IO_FSYNC": 1, "IO_DIRETORIO_TEMP": ".temp/io_experimento"}
+```
+
+Esse JSON não altera a VM. Faça os valores coincidirem com o comando real de
+inicialização. As declarações completas, parâmetros HTTP efetivos, recursos
+planejados, aplicação e opções Locust entram em `parametros.json` e no consolidado;
+`configuracao_servidor_verificada=false` explicita a ausência de verificação remota.
+`--limite` só é usado no pedido CPU; mantenha-o constante nos ensaios CPU.
+
+### Servidores Ubuntu e diagnóstico opcional
+
+Na raiz do projeto, instale somente no ambiente virtual da VM:
+
+```bash
+python3 -m venv .venv  # somente se ainda não houver ambiente Linux
+source .venv/bin/activate
+python -m pip install -r requirements.txt -r requirements-monitoramento.txt
+```
+
+Escolha **um** dos comandos seguintes para a aplicação estudada, no mesmo
+terminal. Exemplo C4 (dois workers; em C1/C2 use um). O ponto de entrada
+experimental é uma factory que importa a API existente e envolve somente seu
+protocolo HTTP. `POI_DIAGNOSTICO=1` habilita PID e timestamps UTC nas três APIs;
+sem essa variável, o diagnóstico é desativado. Não altera cálculos, buffers,
+arquivos, lifespan ou corpos JSON. Os módulos originais das APIs continuam válidos.
+
+```bash
+POI_APLICACAO=cpu POI_DIAGNOSTICO=1 CPU_LIMITE_MAX=1000000 python -m uvicorn scripts.monitoramento.servidor_experimental:criar_app --factory --host 0.0.0.0 --port 8001 --workers 2 &
+servidor_pid=$!
+```
+
+```bash
+POI_APLICACAO=memoria POI_DIAGNOSTICO=1 MEMORY_LIMITE_MIN_MB=1 MEMORY_LIMITE_MAX_MB=64 MEMORY_MAX_SIMULTANEAS=4 MEMORY_RETENCAO_SEGUNDOS=1 python -m uvicorn scripts.monitoramento.servidor_experimental:criar_app --factory --host 0.0.0.0 --port 8002 --workers 2 &
+servidor_pid=$!
+```
+
+```bash
+POI_APLICACAO=io POI_DIAGNOSTICO=1 IO_TAMANHO_MAX_MB=32 IO_OPERACOES_MAX=5 IO_MAX_SIMULTANEAS=2 IO_FSYNC=1 IO_DIRETORIO_TEMP=.temp/io_experimento python -m uvicorn scripts.monitoramento.servidor_experimental:criar_app --factory --host 0.0.0.0 --port 8003 --workers 2 &
+servidor_pid=$!
+```
+
+Confira `ps -p "$servidor_pid" -o pid,ppid,args` e os recursos da VM.
+O PID principal informado deve pertencer à aplicação escolhida. A seleção
+`--aplicacao` organiza arquivos; a árvore continua sendo identificada pelo PID.
+Sem o wrapper, memória/I/O **não oferecem** cabeçalhos de worker/relógio;
+sondagens falham explicitamente e PID aparece como ausente. Não invente um
+offset nesses casos. Em CPU, `CPU_DIAGNOSTICO=1` ainda funciona no módulo original;
+o wrapper preserva cabeçalhos existentes, sem duplicá-los.
+
+### Testes locais e monitoramento
+
+Exemplos para execução posterior, no Ubuntu, sem Locust:
+
+```bash
+curl -i http://127.0.0.1:8001/health
+curl 'http://127.0.0.1:8001/primos?limite=10'
+curl 'http://127.0.0.1:8002/memoria?tamanho_mb=1'
+curl 'http://127.0.0.1:8003/arquivo?tamanho_mb=1&operacoes=1'
+df -h .temp/io_experimento
+find .temp/io_experimento -maxdepth 1 -type f -name 'io_bound_*.tmp' -print
+```
+
+Use apenas as portas dos serviços ativos. O último comando verifica limpeza,
+sem excluir arquivos. Configure encaminhamento NAT das portas necessárias.
+Antes de escrever, confira também espaço no host que contém o disco virtual.
+
+Inicie o monitor correspondente antes do aquecimento; escolha um destes:
+
+```bash
+python scripts/monitoramento/monitorar_linux.py --aplicacao cpu --pid "$servidor_pid" --cenario C4 --usuarios 2 --repeticao 101 --intervalo 1 --duracao 240 --diagnostico-cpu --condicoes 'CPU; 2 vCPUs; 2 GiB; 2 workers; limite=250000; espera=0; fechar'
+python scripts/monitoramento/monitorar_linux.py --aplicacao memoria --pid "$servidor_pid" --cenario C4 --usuarios 2 --repeticao 101 --intervalo 1 --duracao 240 --memoria-detalhada --diagnostico-cpu --condicoes 'RAM; 2 workers; tamanho=10 MiB; retencao=1 s; max_simultaneas=4'
+python scripts/monitoramento/monitorar_linux.py --aplicacao io --pid "$servidor_pid" --cenario C4 --usuarios 2 --repeticao 101 --intervalo 1 --duracao 240 --discos --diagnostico-cpu --condicoes 'IO; 2 workers; arquivo=1 MiB; operacoes=1; fsync=1; diretorio=.temp/io_experimento'
+```
+
+Ctrl+C encerra o monitor, fecha seus arquivos e preserva Uvicorn.
+`--discos` é opcional em qualquer perfil e acrescenta `discos.csv`. Registra por
+dispositivo contadores acumulados de bytes lidos/escritos e operações, deltas,
+bytes/s e delta de tempo ocupado em ms, quando disponível. Intervalo é o delta
+monotônico real entre leituras; a primeira observação não tem delta. Dispositivos
+novos, removidos, sem acesso ou com contador reiniciado não recebem valores
+inventados. Mantém os CSV de CPU/RAM com a semântica anterior.
+
+São contadores do kernel da **VM inteira**, não contadores do endpoint. Incluem
+outros serviços e gravações do próprio monitor. Partições e discos podem contar
+a mesma operação: a análise mantém dispositivos separados, sem somá-los. Cache,
+filesystem, filas, mesclagem de operações e disco virtual afetam a relação com
+bytes HTTP. Esses contadores não comprovam escrita física no disco do Windows.
+`flush()` não garante persistência; `fsync()` solicita sincronização ao sistema,
+mas não elimina cache de leitura nem garante acesso à mídia física do host.
+Contadores ausentes em coletas antigas são tratados como dados indisponíveis.
+
+### Locust Windows, relógios, transferência e análise
+
+Na raiz do projeto:
+
+```powershell
+$env:TEMP='D:\atividade-2-poi\.temp'
+$env:TMP=$env:TEMP
+New-Item -ItemType Directory -Force $env:TEMP | Out-Null
+.\.venv\Scripts\python.exe -m pip install -r requirements-carga.txt
+```
+
+Faça sondagem na porta da aplicação estudada, depois escolha a respectiva carga:
+
+```powershell
+.\.venv\Scripts\python.exe scripts/monitoramento/verificar_relogios.py --url http://127.0.0.1:8001 --saida .temp/relogio_cpu_101_antes.json
+.\.venv\Scripts\python.exe scripts/carga/executar_locust.py --aplicacao cpu --cenario C4 --usuarios 2 --taxa 2 --aquecimento 30 --duracao 60 --limite 250000 --espera 0 --conexoes fechar --registrar-worker-pid --verificacao-relogio .temp/relogio_cpu_101_antes.json --repeticao 101
+
+.\.venv\Scripts\python.exe scripts/monitoramento/verificar_relogios.py --url http://127.0.0.1:8002 --saida .temp/relogio_memoria_101_antes.json
+.\.venv\Scripts\python.exe scripts/carga/executar_locust.py --aplicacao memoria --cenario C4 --usuarios 2 --taxa 2 --aquecimento 30 --duracao 60 --tamanho-mb 10 --retencao-segundos 1 --espera 0 --conexoes fechar --registrar-worker-pid --verificacao-relogio .temp/relogio_memoria_101_antes.json --repeticao 101
+
+.\.venv\Scripts\python.exe scripts/monitoramento/verificar_relogios.py --url http://127.0.0.1:8003 --saida .temp/relogio_io_101_antes.json
+if (Test-Path .temp/config_io_101.json) { throw 'Configuração já existe; confira antes de reutilizar.' }
+'{"IO_DIRETORIO_TEMP":".temp/io_experimento","IO_FSYNC":1}' | Out-File .temp/config_io_101.json -Encoding utf8
+.\.venv\Scripts\python.exe scripts/carga/executar_locust.py --aplicacao io --cenario C4 --usuarios 2 --taxa 2 --aquecimento 30 --duracao 60 --tamanho-mb 1 --operacoes 1 --fsync 1 --config-servidor .temp/config_io_101.json --espera 1 --conexoes fechar --registrar-worker-pid --verificacao-relogio .temp/relogio_io_101_antes.json --repeticao 101
+```
+
+O comando I/O registra o diretório usado no exemplo Ubuntu por meio do JSON.
+Não trate a declaração como configuração observada automaticamente.
+Faça uma sondagem posterior na mesma URL, com arquivo novo `*_depois.json`,
+e compare offsets/incertezas conforme o procedimento definitivo anterior.
+Não execute os três blocos simultaneamente. Calibre memória/I/O separadamente;
+estes exemplos não autorizam volumes maiores nem definem a demanda final.
+O modo CPU existente mantém defaults; os parâmetros calibrados são explícitos.
+
+Transfira somente a pasta de monitoramento correspondente após sua conclusão.
+Exemplo OpenSSH no Windows, substituindo usuário/IP e raiz reais (ou configure
+porta SSH encaminhada com `scp -P PORTA`). A destino não pode conter uma coleta:
+
+```powershell
+$origem='usuario@IP_DA_VM:/caminho/do/projeto/experimentos/resultados/carga/io/C4/usuarios_02/repeticao_101/monitoramento_linux'
+$destino='experimentos/resultados/carga/io/C4/usuarios_02/repeticao_101'
+if (Test-Path "$destino/monitoramento_linux") { throw 'Coleta já existe; não sobrescrever.' }
+scp -r $origem $destino
+.\.venv\Scripts\python.exe scripts/analise/consolidar_resultados.py experimentos/resultados/carga/io/C4/usuarios_02/repeticao_101 --saida experimentos/resultados/analise/io_C4_r101
+```
+
+Troque `io` por `cpu` ou `memoria` para as demais coletas. O destino do Locust
+deve existir e conter a mesma identificação experimental antes da transferência.
+O consolidador verifica aplicação/cenário/demanda/repetição dos metadados Linux.
+O cálculo de latências, correção estimada de relógio, filtro de intervalos e
+avisos sobre CPU global continuam iguais. `discos_janela` contém JSON com
+estatísticas por dispositivo: somas de deltas nos intervalos inteiramente
+contidos na janela, médias/máximos de bytes/s e quantidades válidas. Lacunas ou
+resets deixam totais incompletos indisponíveis, sem extrapolar à janela inteira.
+
+Para validar ferramentas localmente, sem VM:
+
+```powershell
+$pastaTestes=Join-Path $env:TEMP ('pytest_perfis_'+[guid]::NewGuid().ToString('N'))
+.\.venv\Scripts\python.exe -B -m pytest -q -p no:cacheprovider --basetemp $pastaTestes
+```
+
+As validações Linux/disco usam mocks no Windows; não substituem uma validação
+experimental dentro da VM. Não há ajuste remoto de retenção/fsync, comprovação
+automática de provisionamento, medição física do host ou atribuição exclusiva de
+I/O à API. Nenhuma dependência nova foi adicionada nesta extensão.
 
 ## Versionamento e publicação
 
@@ -1239,17 +1432,20 @@ tests/test_monitoramento.py
 tests/test_analise.py
 tests/test_relogios.py
 tests/test_latencias.py
+tests/test_experimentacao.py
 scripts/
   analise/consolidar_resultados.py
   carga/.gitkeep
   carga/locustfile.py
   carga/executar_locust.py
   carga/latencias.py
+  carga/perfis.py
   monitoramento/.gitkeep
   monitoramento/verificar_memoria_windows.py
   monitoramento/verificar_io_windows.py
   monitoramento/monitorar_linux.py
   monitoramento/verificar_relogios.py
+  monitoramento/servidor_experimental.py
 experimentos/
   resultados/.gitkeep
   resultados/README.md

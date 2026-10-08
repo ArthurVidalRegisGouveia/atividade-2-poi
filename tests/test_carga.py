@@ -33,7 +33,7 @@ def test_preparar_sem_http_e_sem_sobrescrever(tmp_path, monkeypatch):
     args = ["--cenario", "C3", "--usuarios", "5", "--taxa", "2", "--repeticao", "2",
             "--somente-preparar"]
     assert carga.main(args) == 0
-    directory = tmp_path / "experimentos/resultados/carga/C3/usuarios_05/repeticao_02"
+    directory = tmp_path / "experimentos/resultados/carga/cpu/C3/usuarios_05/repeticao_02"
     data = json.loads((directory / "parametros.json").read_text(encoding="utf-8"))
     assert data["provisionamento_planejado"] == {"vcpus": 2, "ram_gib": 1, "workers": 2}
     assert not data["provisionamento_verificado_automaticamente"]
@@ -65,7 +65,7 @@ def test_fases_e_falha_no_aquecimento(tmp_path, monkeypatch, returncode, expecte
     assert calls[0][calls[0].index("--limite") + 1] == "100000"
     if len(calls) == 2:
         assert calls[0][calls[0].index("--csv") + 1] != calls[1][calls[1].index("--csv") + 1]
-    path = tmp_path / "experimentos/resultados/carga/C1/usuarios_01/repeticao_01/parametros.json"
+    path = tmp_path / "experimentos/resultados/carga/cpu/C1/usuarios_01/repeticao_01/parametros.json"
     data = json.loads(path.read_text(encoding="utf-8"))
     assert all(item["codigo_saida"] == returncode for item in data["fases"])
     assert all(item["tempo_parede_s"] >= 0 for item in data["fases"])
@@ -176,7 +176,7 @@ def test_parametros_conexao_e_metadados(tmp_path, monkeypatch, mode):
     monkeypatch.setattr(carga, "version", lambda _: "teste")
     carga.main(["--cenario", "C4", "--usuarios", "2", "--conexoes", mode,
                 "--registrar-worker-pid", "--somente-preparar"])
-    path = tmp_path / "experimentos/resultados/carga/C4/usuarios_02/repeticao_01/parametros.json"
+    path = tmp_path / "experimentos/resultados/carga/cpu/C4/usuarios_02/repeticao_01/parametros.json"
     data = json.loads(path.read_text(encoding="utf-8"))
     assert data["parametros"]["conexoes"] == mode
     assert data["parametros"]["registrar_worker_pid"]
@@ -199,7 +199,7 @@ def test_executor_incorpora_marcos_e_relogio(tmp_path, monkeypatch):
 
     monkeypatch.setattr(carga.subprocess, "run", fake_run)
     carga.main(["--cenario", "C4", "--usuarios", "2", "--verificacao-relogio", str(clock_file)])
-    metadata = json.loads((tmp_path / "experimentos/resultados/carga/C4/usuarios_02/repeticao_01/parametros.json").read_text())
+    metadata = json.loads((tmp_path / "experimentos/resultados/carga/cpu/C4/usuarios_02/repeticao_01/parametros.json").read_text())
     assert metadata["verificacao_relogio"]["menor_incerteza"]["offset_estimado_s"] == -3
     assert all("instrumentacao" in phase for phase in metadata["fases"])
 

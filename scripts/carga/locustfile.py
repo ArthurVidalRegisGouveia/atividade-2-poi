@@ -9,6 +9,7 @@ from pathlib import Path
 import time
 
 from scripts.carga.latencias import RegistroLatencias
+from scripts.carga.perfis import PERFIS, pedido, resposta_valida
 
 from locust import HttpUser, events, task
 
@@ -29,6 +30,9 @@ def espera_valida(value):
 
 @events.init_command_line_parser.add_listener
 def argumentos(parser, **kwargs):
+    parser.add_argument("--aplicacao", choices=PERFIS, default="cpu")
+    parser.add_argument("--tamanho-mb", type=inteiro_positivo)
+    parser.add_argument("--operacoes", type=inteiro_positivo, default=1)
     parser.add_argument("--limite", type=inteiro_positivo, default=100000,
                         help="Mesmo limite inclusivo em todos os cenários.")
     parser.add_argument("--espera", type=espera_valida, default=1.0,
@@ -48,6 +52,7 @@ def instrumentar(environment, **kwargs):
         raise ValueError("Arquivo de instrumentação já existe.")
     environment.worker_counts = Counter()
     environment.instrumentacao = {"conexoes": getattr(options, "conexoes", "reutilizar"),
+                                  "aplicacao": getattr(options, "aplicacao", "cpu"),
                                   "registrar_worker_pid": getattr(options, "registrar_worker_pid", False)}
     latency_path = getattr(options, "latencias_saida", None)
     recorder = RegistroLatencias(latency_path, getattr(options, "limite_latencias", 100000)) if latency_path else None
@@ -91,7 +96,7 @@ def instrumentar(environment, **kwargs):
     environment.events.test_stop.add_listener(stopped)
     if recorder:
         def request(name, response_time, exception=None, response=None, **kw):
-            if name == "/primos":
+            if name == PERFIS[getattr(options, "aplicacao", "cpu")]["endpoint"]:
                 pid = response.headers.get("X-Worker-PID", "") if response is not None else ""
                 recorder.registrar(time.time(), response_time, exception is not None, pid)
         environment.events.request.add_listener(request)
@@ -111,10 +116,11 @@ class UsuarioCPU(HttpUser):
 
     @task
     def primos(self):
-        limite = self.environment.parsed_options.limite
+        aplicacao = getattr(self.environment.parsed_options, "aplicacao", "cpu")
+        endpoint, params = pedido(self.environment.parsed_options)
         headers = {"Connection": "close"} if getattr(self.environment.parsed_options, "conexoes", "reutilizar") == "fechar" else {}
         with self.client.get(
-            "/primos", params={"limite": limite}, name="/primos",
+            endpoint, params=params, name=endpoint,
             timeout=30, catch_response=True, headers=headers,
         ) as response:
             registrar_pid(self.environment, response)
@@ -126,9 +132,5 @@ class UsuarioCPU(HttpUser):
             except ValueError:
                 response.failure("Resposta não é JSON.")
                 return
-            if (not isinstance(data, dict)
-                    or data.get("tipo") != "CPU-bound"
-                    or data.get("limite") != limite
-                    or type(data.get("quantidade_primos")) is not int
-                    or not 0 <= data["quantidade_primos"] <= limite):
+            if not resposta_valida(aplicacao, params, data):
                 response.failure("Formato ou parâmetros inesperados.")

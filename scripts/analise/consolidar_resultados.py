@@ -342,7 +342,25 @@ def consolidar(directory, options):
     if (directory.name != f"repeticao_{repeat:02d}" or directory.parent.name != f"usuarios_{users:02d}"
             or directory.parent.parent.name != scenario):
         raise DadosInvalidos("Cenário/demanda/repetição da pasta divergem dos metadados.")
-    output = dict(cenario=scenario, usuarios=users, repeticao=repeat)
+    application = params.get("aplicacao", metadata.get("aplicacao", "cpu"))
+    if application not in ("cpu", "memoria", "io"):
+        raise DadosInvalidos("Aplicação desconhecida nos metadados.")
+    namespace = directory.parent.parent.parent.name
+    if namespace in ("cpu", "memoria", "io"):
+        if namespace != application:
+            raise DadosInvalidos("Aplicação da pasta diverge dos metadados.")
+    elif application != "cpu":
+        raise DadosInvalidos("Caminho antigo é reservado à carga CPU histórica.")
+    output = dict(aplicacao=application, cenario=scenario, usuarios=users, repeticao=repeat)
+    output["endpoint"] = metadata.get("endpoint", {"cpu": "/primos", "memoria": "/memoria", "io": "/arquivo"}[application])
+    output["parametros_http"] = json.dumps(metadata.get("parametros_http"), ensure_ascii=False)
+    config = metadata.get("configuracao_servidor_declarada") or {}
+    output["configuracao_servidor_declarada"] = json.dumps(config, ensure_ascii=False)
+    output["configuracao_servidor_verificada"] = metadata.get("configuracao_servidor_verificada", False)
+    output["retencao_servidor_s"] = config.get("MEMORY_RETENCAO_SEGUNDOS")
+    output["fsync_servidor"] = config.get("IO_FSYNC")
+    for key in ("tamanho_mb", "operacoes"):
+        output[key] = (metadata.get("parametros_http") or {}).get(key, params.get(key))
     for key in ("limite", "espera", "taxa", "duracao", "aquecimento", "url", "conexoes"):
         output[key] = params.get(key)
         if key not in params:
@@ -401,6 +419,8 @@ def consolidar(directory, options):
     monitor_dir = options.monitoramento or directory / "monitoramento_linux"
     monitor_metadata = ler_json(monitor_dir / "metadados.json", warnings)
     if monitor_metadata is not None:
+        if monitor_metadata.get("aplicacao", "cpu") != application:
+            raise DadosInvalidos("Monitoramento pertence a outra aplicação.")
         if any(monitor_metadata.get(key) != output[key] for key in ("cenario", "usuarios", "repeticao")):
             raise DadosInvalidos("Metadados Linux pertencem a outro cenário/demanda/repetição.")
         output["cpus_logicas_observadas"] = monitor_metadata.get("cpus_logicas_observadas")
@@ -471,6 +491,28 @@ def consolidar(directory, options):
             selected_process = filtrar(processes, start, end, shift, "cpu_intervalo_real_s", warnings)
             verificar_cpu_bruto(monitor_dir / "cpu_bruto.jsonl", selected_process, start, end, shift,
                                 numero(monitor_metadata.get("cpus_logicas_observadas")), output, warnings)
+            disk_path = monitor_dir / "discos.csv"
+            if disk_path.is_file() or monitor_metadata.get("discos"):
+                disks = ler_csv(disk_path, ["utc", "dispositivo", "intervalo_real_s", "leitura_bytes_delta", "escrita_bytes_delta"], warnings)
+                selected_disks = filtrar(disks, start, end, shift, "intervalo_real_s", warnings)
+                summaries = {}
+                for device in sorted({row.get("dispositivo") for row in selected_disks if row.get("dispositivo")}):
+                    records = [row for row in selected_disks if row.get("dispositivo") == device]
+                    summary = {"amostras": len(records)}
+                    for field in ("leitura_bytes_delta", "escrita_bytes_delta", "leituras_delta", "escritas_delta", "ocupado_ms_delta"):
+                        values = [numero(row.get(field)) for row in records]
+                        summary[field + "_soma"] = sum(values) if values and all(value is not None and value >= 0 for value in values) else None
+                        if summary[field + "_soma"] is None:
+                            warnings.append(f"Disco {device}: {field} incompleto/inválido na janela.")
+                    for field in ("leitura_bytes_s", "escrita_bytes_s"):
+                        estatisticas(records, field, field, summary, warnings)
+                    summaries[device] = summary
+                output["discos_janela"] = json.dumps(summaries, ensure_ascii=False)
+                warnings.append("Discos: atividade por dispositivo da VM inteira, incluindo monitoramento/cache; não atribuída à aplicação nem somada entre partições/discos.")
+            else:
+                output["discos_janela"] = None
+                if application == "io":
+                    warnings.append("Contadores de disco ausentes: atividade no dispositivo não verificável.")
         if not selected_system:
             warnings.append("Sem amostras Linux válidas na janela; confira arquivos, cobertura e relógios.")
     output["amostras_sistema"], output["registros_processos"] = len(selected_system), len(selected_process)
@@ -511,7 +553,7 @@ def main(argv=None):
         parser.error("Saída precisa ficar fora da coleta Linux original.")
     try:
         rows = [consolidar(path, options) for path in options.entradas]
-        keys = [(row["cenario"], row["usuarios"], row["repeticao"]) for row in rows]
+        keys = [(row["aplicacao"], row["cenario"], row["usuarios"], row["repeticao"]) for row in rows]
         if len(keys) != len(set(keys)):
             raise DadosInvalidos("Repetição duplicada nas entradas.")
         options.saida.mkdir(parents=True, exist_ok=False)
@@ -522,7 +564,7 @@ def main(argv=None):
             writer.writerows(rows)
         with (options.saida / "resumo.txt").open("x", encoding="utf-8") as source:
             for row in rows:
-                source.write(f"{row['cenario']} / {row['usuarios']} usuários / repetição {row['repeticao']}\n")
+                source.write(f"{row['aplicacao']} / {row['cenario']} / {row['usuarios']} usuários / repetição {row['repeticao']}\n")
                 for key, value in row.items():
                     source.write(f"  {key}: {value if value is not None else 'indisponível'}\n")
                 source.write("\n")

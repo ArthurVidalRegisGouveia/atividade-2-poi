@@ -10,6 +10,9 @@ import subprocess
 import sys
 import time
 from urllib.parse import urlsplit
+if __package__ in (None, ""):
+    sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+from scripts.carga.perfis import PERFIS, configurar_servidor, pedido
 
 ROOT = Path(__file__).resolve().parents[2]
 SCENARIOS = {
@@ -36,7 +39,13 @@ def numero(value):
 
 def parser():
     result = argparse.ArgumentParser(description=__doc__)
-    result.add_argument("--url", default="http://127.0.0.1:8001")
+    result.add_argument("--url", help="Padrão: localhost na porta da aplicação.")
+    result.add_argument("--aplicacao", choices=PERFIS, default="cpu")
+    result.add_argument("--tamanho-mb", type=positivo)
+    result.add_argument("--operacoes", type=positivo)
+    result.add_argument("--retencao-segundos", type=numero, help="Declara MEMORY_RETENCAO_SEGUNDOS na VM; não envia HTTP.")
+    result.add_argument("--fsync", type=int, choices=(0, 1), help="Declara IO_FSYNC na VM; não altera servidor.")
+    result.add_argument("--config-servidor", type=Path, help="JSON das variáveis do servidor; declaração não verificada remotamente.")
     result.add_argument("--cenario", choices=SCENARIOS, required=True)
     result.add_argument("--usuarios", type=positivo, required=True)
     result.add_argument("--taxa", type=numero, default=1.0, help="Usuários iniciados/s.")
@@ -55,6 +64,23 @@ def parser():
 
 
 def validar(options, argument_parser):
+    options.url = options.url or f"http://127.0.0.1:{PERFIS[options.aplicacao]['porta']}"
+    if options.aplicacao == "cpu" and (options.tamanho_mb is not None or options.operacoes is not None):
+        argument_parser.error("CPU aceita limite, não tamanho/operações.")
+    if options.aplicacao == "memoria" and options.operacoes is not None:
+        argument_parser.error("Memória não recebe operações.")
+    try:
+        supplied = json.loads(options.config_servidor.read_text(encoding="utf-8-sig")) if options.config_servidor else None
+        config = configurar_servidor(options.aplicacao, supplied, options.retencao_segundos, options.fsync)
+        endpoint, params = pedido(options)
+        if options.aplicacao == "cpu" and params["limite"] > config["CPU_LIMITE_MAX"]:
+            raise ValueError("Limite de primos excede teto declarado.")
+        if options.aplicacao == "memoria" and not config["MEMORY_LIMITE_MIN_MB"] <= params["tamanho_mb"] <= config["MEMORY_LIMITE_MAX_MB"]:
+            raise ValueError("Tamanho de memória fora dos limites declarados.")
+        if options.aplicacao == "io" and (params["tamanho_mb"] > config["IO_TAMANHO_MAX_MB"] or params["operacoes"] > config["IO_OPERACOES_MAX"]):
+            raise ValueError("Parâmetros I/O excedem limites declarados.")
+    except (ValueError, TypeError, OSError) as error:
+        argument_parser.error(str(error))
     if options.limite_latencias > 1000000:
         argument_parser.error("Limite de latências não pode exceder 1000000.")
     url = urlsplit(options.url)
@@ -67,6 +93,7 @@ def validar(options, argument_parser):
     ramp = math.ceil(options.usuarios / options.taxa)
     if min(options.duracao, options.aquecimento) <= ramp:
         argument_parser.error("Aquecimento e duração devem exceder usuarios/taxa.")
+    return config
 
 
 def comando(options, phase, directory):
@@ -82,6 +109,12 @@ def comando(options, phase, directory):
     ]
     if options.registrar_worker_pid:
         command.append("--registrar-worker-pid")
+    command.extend(["--aplicacao", options.aplicacao])
+    if options.aplicacao != "cpu":
+        _, params = pedido(options)
+        command.extend(["--tamanho-mb", str(params["tamanho_mb"])])
+        if options.aplicacao == "io":
+            command.extend(["--operacoes", str(params["operacoes"])])
     if phase == "medicao":
         command.extend(["--latencias-saida", str(directory / "medicao_latencias.csv"),
                         "--limite-latencias", str(options.limite_latencias)])
@@ -95,19 +128,23 @@ def agora():
 def main(argv=None):
     argument_parser = parser()
     options = argument_parser.parse_args(argv)
-    validar(options, argument_parser)
+    server_config = validar(options, argument_parser)
     clock_check = None
     if options.verificacao_relogio:
         clock_check = json.loads(Path(options.verificacao_relogio).read_text(encoding="utf-8"))
         if (not isinstance(clock_check, dict) or not isinstance(clock_check.get("menor_incerteza"), dict)
                 or clock_check.get("url", "").rstrip("/") != options.url.rstrip("/")):
             argument_parser.error("Verificação de relógio sem sondagem válida ou de outra URL.")
-    directory = (ROOT / "experimentos/resultados/carga" / options.cenario
+    directory = (ROOT / "experimentos/resultados/carga" / options.aplicacao / options.cenario
                  / f"usuarios_{options.usuarios:02d}" / f"repeticao_{options.repeticao:02d}")
     # Nunca sobrescreve uma repetição preexistente, inclusive um plano preparado.
     directory.mkdir(parents=True, exist_ok=False)
     metadata = {
-        "parametros": vars(options), "provisionamento_planejado": SCENARIOS[options.cenario],
+        "parametros": {key: str(value) if isinstance(value, Path) else value for key, value in vars(options).items()},
+        "aplicacao": options.aplicacao, "endpoint": pedido(options)[0], "parametros_http": pedido(options)[1],
+        "configuracao_servidor_declarada": server_config,
+        "configuracao_servidor_verificada": False,
+        "provisionamento_planejado": SCENARIOS[options.cenario],
         "provisionamento_verificado_automaticamente": False,
         "python": sys.version, "locust": version("locust"),
         "modelo": "fechado", "politica_espera": "fixa após cada resposta",

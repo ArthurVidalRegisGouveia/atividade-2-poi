@@ -333,3 +333,75 @@ def test_deltas_cpu_normalizacao_e_incompatibilidade_global(tmp_path):
     analysis.verificar_cpu_bruto(path, rows, analysis.instante("2026-10-08T16:00:02Z"),
                                  analysis.instante("2026-10-08T16:00:04Z"), 0, 2, output, warnings)
     assert any("inconsistente com os deltas" in warning for warning in warnings)
+
+
+def copiar_perfil(run, tmp_path, app):
+    import shutil
+    target = tmp_path / f"novos/{app}/C1/usuarios_01/repeticao_01"
+    shutil.copytree(run, target)
+    data = json.loads((target / "parametros.json").read_text(encoding="utf-8"))
+    data["parametros"]["aplicacao"] = app
+    data["aplicacao"] = app
+    data["endpoint"] = {"cpu": "/primos", "memoria": "/memoria", "io": "/arquivo"}[app]
+    data["parametros_http"] = {"limite": 100000} if app == "cpu" else {"tamanho_mb": 1}
+    data["configuracao_servidor_declarada"] = {"IO_FSYNC": 1} if app == "io" else {"MEMORY_RETENCAO_SEGUNDOS": 2} if app == "memoria" else {}
+    (target / "parametros.json").write_text(json.dumps(data), encoding="utf-8")
+    monitor = target / "monitoramento_linux/metadados.json"
+    data = json.loads(monitor.read_text(encoding="utf-8"))
+    data["aplicacao"] = app
+    monitor.write_text(json.dumps(data), encoding="utf-8")
+    return target
+
+
+@pytest.mark.parametrize("app", ["cpu", "memoria", "io"])
+def test_consolidacao_perfis_novos_e_latencias(run, tmp_path, app):
+    adicionar_latencias(run)
+    target = copiar_perfil(run, tmp_path, app)
+    row = analysis.consolidar(target, options(latencias_completas=False))
+    assert row["aplicacao"] == app
+    assert row["p95_janela_ms"] == 19
+    if app == "io":
+        assert row["fsync_servidor"] == 1
+        assert row["discos_janela"] is None
+        assert "atividade no dispositivo não verificável" in row["avisos"]
+    if app == "memoria":
+        assert row["retencao_servidor_s"] == 2
+
+
+def test_coletas_aplicacoes_diferentes_nao_sao_duplicadas(run, tmp_path):
+    paths = [copiar_perfil(run, tmp_path, app) for app in ("cpu", "memoria", "io")]
+    assert analysis.main([*(str(path) for path in paths), "--saida", str(tmp_path / "saida"),
+                          "--inicio-utc", "2026-10-08T16:00:01Z", "--fim-utc", "2026-10-08T16:00:09Z"]) == 0
+    with (tmp_path / "saida/consolidado.csv").open(encoding="utf-8", newline="") as source:
+        assert {row["aplicacao"] for row in csv.DictReader(source)} == {"cpu", "memoria", "io"}
+    assert analysis.consolidar(run, options())["aplicacao"] == "cpu"  # legado
+
+
+def test_monitor_ou_namespace_de_outro_perfil_rejeitado(run, tmp_path):
+    target = copiar_perfil(run, tmp_path, "io")
+    monitor = target / "monitoramento_linux/metadados.json"
+    data = json.loads(monitor.read_text(encoding="utf-8"))
+    data["aplicacao"] = "memoria"
+    monitor.write_text(json.dumps(data), encoding="utf-8")
+    with pytest.raises(analysis.DadosInvalidos, match="outra aplicação"):
+        analysis.consolidar(target, options())
+    data = json.loads((target / "parametros.json").read_text(encoding="utf-8"))
+    data["parametros"]["aplicacao"] = "cpu"
+    (target / "parametros.json").write_text(json.dumps(data), encoding="utf-8")
+    with pytest.raises(analysis.DadosInvalidos, match="Aplicação da pasta"):
+        analysis.consolidar(target, options())
+
+
+def test_consolidacao_discos_filtra_janela_sem_somar_dispositivos(run, tmp_path):
+    target = copiar_perfil(run, tmp_path, "io")
+    rows = [{"utc": f"2026-10-08T16:00:{second:02d}Z", "dispositivo": device, "intervalo_real_s": 1,
+             "leitura_bytes_delta": amount, "escrita_bytes_delta": amount * 2, "leituras_delta": 1,
+             "escritas_delta": 2, "ocupado_ms_delta": 3, "leitura_bytes_s": amount, "escrita_bytes_s": amount * 2}
+            for device in ("vda", "vda1") for second, amount in [(1, 999), (3, 10), (5, 20), (9, 999)]]
+    write_csv(target / "monitoramento_linux/discos.csv", rows)
+    result = analysis.consolidar(target, options())
+    disks = json.loads(result["discos_janela"])
+    assert set(disks) == {"vda", "vda1"}
+    assert disks["vda"]["leitura_bytes_delta_soma"] == 30
+    assert disks["vda"]["escrita_bytes_s_media"] == 30
+    assert "não atribuída à aplicação" in result["avisos"]

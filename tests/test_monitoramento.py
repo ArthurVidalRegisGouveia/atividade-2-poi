@@ -134,7 +134,7 @@ def test_csv_duracao_e_preservacao(environment, tmp_path, monkeypatch):
     monkeypatch.setattr(monitor.time, "sleep", lambda seconds: setattr(clock, "value", clock.value + seconds))
     collector = monitor.Coletor(42)
     base = monitor.executar(options(tmp_path), collector)
-    assert base == tmp_path / "C1/usuarios_05/repeticao_02/monitoramento_linux"
+    assert base == tmp_path / "cpu/C1/usuarios_05/repeticao_02/monitoramento_linux"
     with (base / "sistema.csv").open(encoding="utf-8", newline="") as source:
         reader = csv.DictReader(source)
         rows = list(reader)
@@ -167,7 +167,7 @@ def test_encerramento_seguro(environment, tmp_path, monkeypatch, exception, stat
             monitor.executar(options(tmp_path), monitor.Coletor(42))
     else:
         monitor.executar(options(tmp_path), monitor.Coletor(42))
-    base = tmp_path / "C1/usuarios_05/repeticao_02/monitoramento_linux"
+    base = tmp_path / "cpu/C1/usuarios_05/repeticao_02/monitoramento_linux"
     data = json.loads((base / "metadados.json").read_text(encoding="utf-8"))
     assert data["estado"] == state
     assert "fim_utc" in data
@@ -177,10 +177,10 @@ def test_encerramento_seguro(environment, tmp_path, monkeypatch, exception, stat
 
 
 def test_arquivo_no_caminho_de_saida(environment, tmp_path):
-    (tmp_path / "C1").write_text("preservar", encoding="utf-8")
+    (tmp_path / "cpu").write_text("preservar", encoding="utf-8")
     with pytest.raises(OSError):
         monitor.executar(options(tmp_path), monitor.Coletor(42))
-    assert (tmp_path / "C1").read_text(encoding="utf-8") == "preservar"
+    assert (tmp_path / "cpu").read_text(encoding="utf-8") == "preservar"
 
 
 def test_diagnostico_bruto_opcional(environment, tmp_path, monkeypatch):
@@ -203,3 +203,22 @@ def test_diagnostico_bruto_opcional(environment, tmp_path, monkeypatch):
     assert records[1]["processos"][0]["cpu_times_s"]["children_user"] == 999
     assert records[2]["processos"][0]["anterior"] == [0, 1]
     assert json.loads((base / "metadados.json").read_text())["diagnostico_cpu"]
+
+
+def test_saida_memoria_io_e_discos_opcionais(environment, tmp_path, monkeypatch):
+    root, clock = environment
+    monkeypatch.setattr(monitor.time, "sleep", lambda seconds: setattr(clock, "value", clock.value + seconds))
+    monkeypatch.setattr(monitor.psutil, "disk_io_counters", lambda **kwargs: {"vda": SimpleNamespace(
+        read_bytes=int(clock.value * 10), write_bytes=int(clock.value * 20), read_count=1, write_count=2, busy_time=0)})
+    for app in ("memoria", "io"):
+        args = options(tmp_path)
+        args.aplicacao = app
+        args.discos = True
+        base = monitor.executar(args, monitor.Coletor(42))
+        assert base == tmp_path / f"{app}/C1/usuarios_05/repeticao_02/monitoramento_linux"
+        with (base / "discos.csv").open(encoding="utf-8", newline="") as source:
+            rows = list(csv.DictReader(source))
+        assert len(rows) == 2
+        assert rows[0]["leitura_bytes_delta"] == ""
+        assert float(rows[1]["escrita_bytes_delta"]) == 20
+        assert json.loads((base / "metadados.json").read_text())["aplicacao"] == app

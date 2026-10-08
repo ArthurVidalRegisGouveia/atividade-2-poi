@@ -13,7 +13,11 @@ import time
 
 import psutil
 
-VERSION = "1.1.0"
+VERSION = "1.2.0"
+DISK_FIELDS = ["amostra", "utc", "tempo_relativo_s", "dispositivo", "intervalo_real_s",
+               "leitura_bytes_total", "escrita_bytes_total", "leituras_total", "escritas_total",
+               "leitura_bytes_delta", "escrita_bytes_delta", "leituras_delta", "escritas_delta",
+               "leitura_bytes_s", "escrita_bytes_s", "ocupado_ms_delta", "erro"]
 SCENARIOS = {
     "C1": {"vcpus": 1, "ram_gib": 1, "workers": 1},
     "C2": {"vcpus": 1, "ram_gib": 2, "workers": 1},
@@ -52,6 +56,8 @@ def segundos(value):
 def parser():
     result = argparse.ArgumentParser(description=__doc__)
     result.add_argument("--pid", type=positivo, required=True)
+    result.add_argument("--aplicacao", choices=("cpu", "memoria", "io"), default="cpu")
+    result.add_argument("--discos", action="store_true", help="Contadores por dispositivo da VM, sem atribuição à aplicação.")
     result.add_argument("--cenario", choices=SCENARIOS, required=True)
     result.add_argument("--usuarios", type=positivo, required=True)
     result.add_argument("--repeticao", type=positivo, default=1)
@@ -82,6 +88,44 @@ def contadores_sistema():
     except (OSError, AttributeError, ValueError) as error:
         result = {"erro": type(error).__name__}
     return dict(result, utc=utc(), monotonic_before_s=before, monotonic_after_s=time.monotonic())
+
+
+class ColetorDiscos:
+    def __init__(self):
+        self.previous = {}
+
+    def sample(self, index, elapsed):
+        try:
+            counters = psutil.disk_io_counters(perdisk=True, nowrap=False)
+        except (OSError, psutil.Error, NotImplementedError) as error:
+            self.previous = {}
+            return [dict(amostra=index, utc=utc(), tempo_relativo_s=elapsed, erro=type(error).__name__)]
+        now, stamp = time.monotonic(), utc()
+        current, rows = {}, []
+        for device, counter in (counters or {}).items():
+            row = dict.fromkeys(DISK_FIELDS)
+            row.update(amostra=index, utc=stamp, tempo_relativo_s=elapsed, dispositivo=device)
+            values = [counter.read_bytes, counter.write_bytes, counter.read_count, counter.write_count,
+                      getattr(counter, "busy_time", None)]
+            for key, value in zip(DISK_FIELDS[5:9], values[:4]):
+                row[key] = value
+            previous = self.previous.get(device)
+            if previous and now > previous[1]:
+                interval = now - previous[1]
+                deltas = [value - old if value is not None and old is not None else None
+                          for value, old in zip(values, previous[0])]
+                row["intervalo_real_s"] = interval
+                if any(value is not None and value < 0 for value in deltas):
+                    row["erro"] = "contador_reiniciado"
+                else:
+                    for key, value in zip(["leitura_bytes_delta", "escrita_bytes_delta", "leituras_delta", "escritas_delta", "ocupado_ms_delta"], deltas):
+                        row[key] = value
+                    row["leitura_bytes_s"] = deltas[0] / interval
+                    row["escrita_bytes_s"] = deltas[1] / interval
+            current[device] = values, now
+            rows.append(row)
+        self.previous = current
+        return rows or [dict(amostra=index, utc=stamp, tempo_relativo_s=elapsed, erro="contadores_indisponiveis")]
 
 
 class Coletor:
@@ -175,7 +219,7 @@ class Coletor:
 
 
 def executar(options, collector):
-    base = (options.resultados / options.cenario / f"usuarios_{options.usuarios:02d}"
+    base = (options.resultados / options.aplicacao / options.cenario / f"usuarios_{options.usuarios:02d}"
             / f"repeticao_{options.repeticao:02d}" / "monitoramento_linux")
     # Pode coexistir com CSV do Locust, mas nunca sobrescreve uma coleta existente.
     base.mkdir(parents=True, exist_ok=False)
@@ -184,6 +228,9 @@ def executar(options, collector):
         "sistema": platform.system(), "kernel": platform.release(), "inicio_utc": utc(),
         "pid_principal": options.pid, "criado_epoch_s": collector.identity[1],
         "cenario": options.cenario, "usuarios": options.usuarios, "repeticao": options.repeticao,
+        "aplicacao": options.aplicacao,
+        "discos": options.discos,
+        "discos_base": "psutil.disk_io_counters(perdisk=True, nowrap=False); VM inteira por dispositivo; bytes/operações/ms; não atribuído à aplicação",
         "provisionamento_planejado": SCENARIOS[options.cenario],
         "cpus_logicas_observadas": collector.cpus, "ram_total_observada_bytes": psutil.virtual_memory().total,
         "intervalo_s": options.intervalo, "duracao_s": options.duracao,
@@ -206,6 +253,7 @@ def executar(options, collector):
     started = time.monotonic()
     last, deadline = started, started + options.intervalo
     raw_file = None
+    disk_file = None
     print(f"Coleta em {base}; Ctrl+C encerra sem finalizar o servidor.")
     try:
         with (base / "sistema.csv").open("x", encoding="utf-8", newline="") as system_file, \
@@ -214,6 +262,11 @@ def executar(options, collector):
             process_writer = csv.DictWriter(process_file, fieldnames=PROCESS_FIELDS)
             system_writer.writeheader()
             process_writer.writeheader()
+            if options.discos:
+                disk_file = (base / "discos.csv").open("x", encoding="utf-8", newline="")
+                disk_writer = csv.DictWriter(disk_file, fieldnames=DISK_FIELDS)
+                disk_writer.writeheader()
+                disks = ColetorDiscos()
             if options.diagnostico_cpu:
                 raw_file = (base / "cpu_bruto.jsonl").open("x", encoding="utf-8")
                 raw_file.write(json.dumps({"tipo": "baseline", "sistema": collector.raw_initial}) + "\n")
@@ -234,6 +287,9 @@ def executar(options, collector):
                 system, rows = collector.sample(metadata["amostras"] + 1, now - started, now - last)
                 system_writer.writerow(system)
                 process_writer.writerows(rows)
+                if disk_file:
+                    disk_writer.writerows(disks.sample(metadata["amostras"] + 1, now - started))
+                    disk_file.flush()
                 system_file.flush()
                 process_file.flush()
                 if raw_file:
@@ -255,6 +311,8 @@ def executar(options, collector):
     finally:
         if raw_file:
             raw_file.close()
+        if disk_file:
+            disk_file.close()
         metadata.update(fim_utc=utc(), tempo_parede_s=time.monotonic() - started)
         salvar()
     return base
