@@ -704,6 +704,142 @@ $pastaTestes = 'D:\atividade-2-poi\.temp\pytest_carga_' + [guid]::NewGuid().ToSt
 Referências: [configuração e exportação CSV do Locust](https://docs.locust.io/en/stable/configuration.html)
 e [tarefas e política de espera](https://docs.locust.io/en/stable/writing-a-locustfile.html).
 
+## Monitoramento de CPU e memória dentro da VM Linux
+
+`scripts/monitoramento/monitorar_linux.py` coleta métricas da VM e da árvore
+de um PID informado. Execute-o **dentro do Ubuntu**, enquanto Locust executa
+no Windows. Não modifica o servidor, seus workers ou o provisionamento.
+Não identifica o serviço somente pelo nome `uvicorn`: o operador deve informar
+o PID principal correto. A árvore inclui o principal, workers e eventuais
+auxiliares (por exemplo, resource tracker); sua contagem não é necessariamente
+igual à quantidade de workers. Descendentes independentes desse PID não são
+monitorados. Evite usar um shell ou supervisor genérico que tenha outros serviços
+como PID principal. A identidade é o par PID/data de criação, para distinguir
+reutilização de PID e substituição de workers.
+
+Instale a dependência separada no ambiente virtual Ubuntu do projeto:
+
+```bash
+cd /caminho/atividade-2-poi
+source .venv/bin/activate
+python -m pip install -r requirements-monitoramento.txt
+python -m pip check
+```
+
+O arquivo fixa psutil 7.2.2. Nenhuma dependência de monitoramento foi acrescentada
+a `requirements.txt`. Use o mesmo usuário do servidor para ler seus processos.
+USS/PSS podem requerer permissões adicionais; ausência dessas métricas não
+justifica executar indiscriminadamente como root.
+
+Se o servidor já estiver ativo, confira sua árvore com:
+
+```bash
+ps -eo pid,ppid,args --forest
+```
+
+Localize `python -m uvicorn apps.cpu_bound.main:app` e escolha o principal,
+não um worker isolado. Confira PID e PPID; não use automaticamente todos os
+resultados de uma busca por `uvicorn`. Para uma futura inicialização controlada
+em C1/C2, em um terminal que permanecerá aberto:
+
+```bash
+python -m uvicorn apps.cpu_bound.main:app --host 0.0.0.0 --port 8001 --workers 1 &
+servidor_pid=$!
+printf 'PID principal: %s\n' "$servidor_pid"
+```
+
+Não inicie uma segunda instância se a porta já estiver ocupada. Em C3/C4 use
+`--workers 2`, sem `--reload`. Transcreva o PID para outro terminal Ubuntu e
+inicie a coleta **antes do aquecimento do Locust**. Exemplo, substituindo 1234
+pelo PID real:
+
+```bash
+python scripts/monitoramento/monitorar_linux.py --pid 1234 --cenario C1 --usuarios 1 --repeticao 1 --intervalo 1 --duracao 120 --resultados experimentos/resultados/carga --condicoes 'VirtualBox NAT; CPU_LIMITE_MAX=1000000; limite Locust=100000; espera=1s; workers=1'
+```
+
+`--cenario`, `--usuarios` e `--repeticao` seguem os nomes do executor Locust.
+`--duracao` é opcional; sem ela, a coleta segue até Ctrl+C. A duração deve ser
+maior que o intervalo. `--memoria-detalhada` habilita USS/PSS, desativados por
+padrão para reduzir o custo de leitura. `--condicoes` registra notas sobre a
+configuração efetiva, rede, workers, limite, espera e demais condições;
+não informe credenciais ou dados pessoais. Os recursos planejados do cenário
+ficam nos metadados, junto com CPUs lógicas e RAM total observadas; confirme
+manualmente se a configuração efetiva corresponde ao cenário.
+
+Saída: `experimentos/resultados/carga/C1/usuarios_01/repeticao_01/monitoramento_linux/`.
+Essa subpasta pode coexistir com os arquivos Locust da mesma repetição, mas
+uma coleta preexistente nunca é sobrescrita. Para nova coleta, escolha outra
+repetição ou outra raiz de resultados. Não aponte o executor Locust no Windows
+para uma pasta de repetição já preenchida: execute em raízes locais separadas
+e posteriormente reúna os CSV Linux na subpasta `monitoramento_linux`.
+
+São gerados `sistema.csv`, `processos.csv` e `metadados.json`, em UTF-8.
+Ctrl+C fecha os CSV e registra o encerramento, sem encerrar Uvicorn. O término
+da duração e o desaparecimento do principal também finalizam a coleta.
+Erros de saída ou de enumeração da árvore interrompem e são registrados quando
+o diretório permanece gravável. Falhas de leitura de um descendente são
+registradas em `erro`; não viram zeros inventados. Confira após a execução:
+
+```bash
+head -n 3 experimentos/resultados/carga/C1/usuarios_01/repeticao_01/monitoramento_linux/sistema.csv
+wc -l experimentos/resultados/carga/C1/usuarios_01/repeticao_01/monitoramento_linux/processos.csv
+cat experimentos/resultados/carga/C1/usuarios_01/repeticao_01/monitoramento_linux/metadados.json
+```
+
+Interpretação das métricas:
+
+| Coluna/métrica | Cálculo e significado |
+|---|---|
+| `utc`, `tempo_relativo_s` | Horário ISO 8601 UTC no início da amostra; segundos monotônicos desde o início da coleta. O monotônico não compara relógios de máquinas diferentes. |
+| `intervalo_real_s` | Tempo entre inícios das amostras; atrasos não são substituídos pelo intervalo configurado. |
+| `cpu_sistema_capacidade_pct` | `psutil.cpu_percent(interval=None)`: utilização agregada da VM entre chamadas, de 0 a 100% da capacidade de todas as CPUs lógicas. Inclui monitor, servidor e demais atividades do sistema. |
+| `cpu_uma_cpu_pct` | `100 × delta(user + system) / delta(monotônico)` de cada processo. 100% significa uma CPU lógica ocupada; pode exceder 100% em processo com várias threads. Não inclui tempos acumulados dos filhos. |
+| `cpu_intervalo_real_s` | Denominador efetivamente usado para CPU de cada processo, entre suas leituras. |
+| `cpu_capacidade_vm_pct` | Percentual anterior dividido pelo número de CPUs lógicas observado no início. Em 2 vCPUs, 100% de uma CPU corresponde a 50% da VM. |
+| `cpu_soma_uma_cpu_pct`, `cpu_soma_capacidade_vm_pct` | Soma dos percentuais dos processos enumerados, nas duas escalas. Só preenchida quando todos têm CPU válida; confira `cpu_processos_completa`. |
+| `ram_total_bytes`, `ram_disponivel_bytes` | RAM total e estimativa disponível para novas alocações sem swap, por `psutil.virtual_memory()`. Disponível inclui memória recuperável; não é apenas RAM livre. |
+| `ram_usada_psutil_bytes` | Campo `used` da API, conforme a definição Linux da versão instalada; não presuma que seja total menos disponível. |
+| `ram_nao_disponivel_bytes`, `ram_percent_psutil` | Total menos disponível; o percentual da API corresponde a `100 × (total − disponível) / total`. |
+| `rss_bytes`, `vms_bytes` | Memória residente e espaço de endereçamento virtual por processo. VMS não representa RAM física consumida. |
+| `rss_soma_bytes` | **Soma de RSS**, não memória privada: páginas compartilhadas podem ser contadas várias vezes. |
+| `uss_bytes`, `pss_bytes` | Opcionais: USS representa páginas exclusivas; PSS reparte páginas compartilhadas proporcionalmente entre processos que as mapeiam. São leituras mais custosas, dependentes de suporte/permissões. |
+| `uss_soma_bytes`, `pss_soma_bytes` | Somas somente quando disponíveis em todos os processos da amostra. USS exclui compartilhamento; PSS considera a partilha, inclusive com processos fora da árvore. |
+| `processos_adicionados`, `processos_removidos` | Listas JSON de pares PID/data de criação comparados com a amostra anterior. Na primeira amostra todos são novos; perdas de acesso também podem afetar a identificação. |
+
+Campos indisponíveis são células vazias, não zero. A primeira observação de
+cada processo serve de referência para CPU e fica sem percentual; a primeira
+medição válida aparece na observação seguinte. A CPU do sistema é inicializada
+antes da coleta para descartar o primeiro retorno inválido da API. Os CSV não
+são uma fotografia atômica: processos e sistema são lidos sequencialmente.
+Amostragem ocorre aproximadamente a cada segundo; se houver atraso, não cria
+rajadas para recuperar amostras perdidas. O período menor que um intervalo no
+fim da duração não gera uma amostra extra. Não altere vCPUs durante a coleta.
+
+Workers que surgem e desaparecem entre amostras podem não ser observados.
+CPU executada após a última leitura de um processo encerrado não é recuperada.
+Se o principal morrer, a coleta para; não segue workers órfãos nem um novo
+servidor em PID reutilizado. O monitor também consome recursos, especialmente
+com USS/PSS; mantenha método e intervalo iguais entre cenários e observe seu
+impacto durante o piloto. Não há coleta de swap ou I/O nesta versão.
+
+Relacione Linux e Locust por cenário/demanda/repetição e horários UTC dos
+metadados. Confira a sincronização dos relógios Windows/Ubuntu antes do teste;
+diferenças de relógio afetam alinhamento. Os metadados Locust identificam início
+e fim de aquecimento e medição, incluindo rampa e encerramento. Recorte a mesma
+janela estável dos CSV históricos e do monitor; não misture repouso, aquecimento
+ou encerramento com médias definitivas. Tempo monotônico só relaciona amostras
+dentro de uma execução. Revise notas e dados antes de publicação.
+
+O funcionamento Linux **ainda precisa ser validado na VM**. Os testes Windows
+usam mocks para árvore, métricas, alterações de PID, permissões, arquivos,
+duração e interrupção. Após copiar o script para Ubuntu, faça uma coleta curta
+sem carga, confira o PID e os CSV, e só então realize um piloto supervisionado.
+Nesta etapa, a suíte Windows passou com 134 testes (115 anteriores e 19 novos
+de monitoramento), com apenas o aviso conhecido do Starlette sobre HTTPX.
+`pip check` confirmou compatibilidade no ambiente virtual local; isso não
+substitui a instalação e a verificação no Ubuntu.
+Referência das definições e limitações: [documentação oficial do psutil](https://psutil.readthedocs.io/en/latest/).
+
 ## Versionamento e publicação
 
 Versione código, testes, scripts, documentação e as cópias revisadas dos resultados
@@ -753,6 +889,7 @@ tests/test_cpu.py
 tests/test_memory.py
 tests/test_io.py
 tests/test_carga.py
+tests/test_monitoramento.py
 scripts/
   carga/.gitkeep
   carga/locustfile.py
@@ -760,6 +897,7 @@ scripts/
   monitoramento/.gitkeep
   monitoramento/verificar_memoria_windows.py
   monitoramento/verificar_io_windows.py
+  monitoramento/monitorar_linux.py
 experimentos/
   resultados/.gitkeep
   resultados/README.md
@@ -771,6 +909,7 @@ docs/validacao_io_windows.md
 docs/preparacao_repositorio.md
 requirements.txt
 requirements-carga.txt
+requirements-monitoramento.txt
 .gitignore
 .gitattributes
 README.md
