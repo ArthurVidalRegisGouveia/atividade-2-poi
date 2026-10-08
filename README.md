@@ -1379,6 +1379,169 @@ experimental dentro da VM. Não há ajuste remoto de retenção/fsync, comprova�
 automática de provisionamento, medição física do host ou atribuição exclusiva de
 I/O à API. Nenhuma dependência nova foi adicionada nesta extensão.
 
+## Orquestrador dos experimentos definitivos
+
+`scripts/experimentacao/orquestrar.py` funciona no Windows e reutiliza executor,
+sondagens, monitor e consolidador. **O padrão é planejamento**, sem SSH, HTTP ou
+carga. `--validar-ambiente` faz auditoria SSH e GET `/health`, mas não sondagens
+de relógio nem carga. Somente `--executar` permite iniciar as coletas. Nenhuma
+execução remota foi realizada durante a implementação do orquestrador.
+
+O alvo padrão é a VM declarada `POI-Ubuntu-Server`, SSH
+`osboxes@127.0.0.1:2222`, projeto `/home/osboxes/atividade-2-poi`. O nome da VM
+é uma declaração do operador; a auditoria observa recursos via SSH, sem controlar
+VirtualBox. Não altera vCPUs, RAM, workers ou servidores. Selecione e confirme
+manualmente o cenário antes de executar. Execução/validação exigem um único cenário.
+
+### Matriz e identificação
+
+| Aplicação | Parâmetros fixos | Usuários |
+|---|---|---|
+| cpu | limite 250000 | 1, 2, 5, 10 |
+| memoria | 50 MiB; retenção efetiva 1 s | 1, 2, 3 |
+| io | 10 MiB; 1 operação; `IO_FSYNC=1` efetivo | 1, 2 |
+
+Cada combinação tem três repetições lógicas. Aquecimento 30 s, medição configurada
+60 s (ambas incluem rampa), espera zero, conexões fechadas e taxa de criação igual
+ao número de usuários. CPU recebe diagnóstico bruto; memória, diagnóstico bruto
+e USS/PSS; I/O, ambos mais contadores de disco. Monitoramento a cada 1 s, por
+200 s por padrão. A duração mínima permitida é 180 s, considerando drenagens e
+margem; coletas que não cobrem a carga após alinhamento UTC são recusadas.
+
+A inspeção local encontrou formatos históricos `carga/C1/...` e `carga/C4/...`,
+além de `carga/memoria/...` e `carga/io/...`, com repetições exploratórias até R107.
+Nenhuma foi movida ou alterada. A reserva definitiva usa:
+
+`R = base + 10 × (tentativa − 1) + repetição lógica`.
+
+Com base 1000: primeira tentativa R1001–R1003; segunda R1011–R1013.
+`--base-repeticao` aceita múltiplos de 1000 a partir de 1000; `--tentativa` vai
+de 1 a 99. As pastas seguem o padrão existente
+`carga/<aplicacao>/<cenario>/usuarios_NN/repeticao_NN/`. A existência local/remota
+impede reutilização, independentemente do ID de campanha. A reserva não substitui
+a conferência de colisões, que é feita antes de criar cada coleta.
+
+`--id-execucao` identifica a campanha e seus manifestos em
+`experimentos/resultados/orquestracao/<id>/`. `indice.json` reúne estados
+planejada, em andamento, concluída, falha e interrompida. O arquivo
+`orquestracao/indice_geral.json` reúne os índices das campanhas. Cada combinação tem
+um `manifesto.json`, configuração verificada, sondagens antes/depois, console
+Locust e análise. O manifesto registra comandos, payloads SSH sem credenciais,
+horários, status, caminhos, configuração auditada, avisos e hashes dos artefatos.
+
+### Preparação manual da VM
+
+Disponibilize os scripts atuais no mesmo projeto da VM antes de iniciar servidores.
+O auxiliar SSH precisa de `psutil`, já previsto em `requirements-monitoramento.txt`.
+Não há dependências novas. Para copiar apenas o auxiliar, posteriormente:
+
+```powershell
+ssh -p 2222 osboxes@127.0.0.1 'mkdir -p /home/osboxes/atividade-2-poi/scripts/experimentacao'
+scp -P 2222 scripts/experimentacao/agente_linux.py osboxes@127.0.0.1:/home/osboxes/atividade-2-poi/scripts/experimentacao/agente_linux.py
+```
+
+Confirme também que `perfis.py`, o monitor com `--aplicacao`/`--discos` e a factory
+experimental estão atualizados na VM. Use os comandos de inicialização das três
+APIs na seção anterior, com workers do cenário. CPU deve aceitar limite 250000,
+memória usar `MEMORY_RETENCAO_SEGUNDOS=1`, I/O usar `IO_FSYNC=1`, e todas oferecer
+cabeçalhos experimentais. Escolha diretório I/O dedicado e confira espaço livre.
+
+O helper associa portas a árvores Uvicorn, distingue o principal dos workers
+`multiprocessing`, lê somente variáveis relevantes dos processos e compara
+configurações entre gerenciador e workers. Padrões são auditados por AST em
+`os.getenv`, com hash do código. Se o código foi modificado depois da criação
+dos processos, a auditoria exige reinício. Não importa nem executa as APIs para
+descobrir padrões. Ausência de acesso a PID, ambiente, socket ou identificação
+segura interrompe a validação. Processos de servidor nunca são encerrados.
+
+MemTotal é comparado com a RAM planejada na faixa de 85%–105%, para comportar
+reserva do kernel; o valor real é salvo. CPUs lógicas e número de workers precisam
+coincidir exatamente. O helper verifica escrita em resultados e no diretório I/O;
+para I/O exige pelo menos 256 MiB livres. A sonda de escrita é exclusiva e somente
+esse arquivo recém-criado é removido. Nenhum resultado preexistente é excluído.
+
+### Planejar, validar C4 e executar uma repetição
+
+No Windows, na raiz do projeto, com `.venv`, Locust e OpenSSH disponíveis:
+
+```powershell
+# Sem rede ou carga; reserve um ID novo.
+.\.venv\Scripts\python.exe scripts/experimentacao/orquestrar.py --planejar --id-execucao definitivos_C4 --cenario C4
+
+# Audita os três servidores C4; usa a mesma campanha sem sobrescrever validações.
+.\.venv\Scripts\python.exe scripts/experimentacao/orquestrar.py --validar-ambiente --id-execucao definitivos_C4 --retomar --cenario C4
+
+# SOMENTE quando autorizado: uma combinação CPU, repetição lógica 1 (R1001).
+.\.venv\Scripts\python.exe scripts/experimentacao/orquestrar.py --executar --id-execucao definitivos_C4 --retomar --cenario C4 --confirmar-provisionamento C4 --aplicacao cpu --usuarios 1 --repeticao 1
+```
+
+Para planejar toda a matriz, omita os filtros de cenário/aplicação/usuários/repetição:
+são 108 execuções planejadas, sem dispará-las. Para validar apenas o servidor CPU,
+acrescente `--aplicacao cpu`; os demais não precisam estar ligados. Para uma única
+coleta de memória, escolha `--aplicacao memoria --usuarios 1 --repeticao 1`;
+para I/O, `--aplicacao io --usuarios 1 --repeticao 1`. Retenção/fsync não são
+alterados remotamente: valores incompatíveis bloqueiam a execução.
+
+Na execução, o fluxo é: auditoria → relógio antes → monitor remoto → comprovação
+de prontidão (processo vivo, metadados executando e primeira linha CSV) → Locust
+→ relógio imediatamente depois → término do monitor → SCP para destino novo
+→ conferência de identidades/cobertura/relógios → consolidação. Não espera um
+atraso fixo para presumir que o monitor está pronto. Polling padrão de 1 s é
+apenas consulta de estado. Cada operação tem limites configuráveis:
+`--timeout-ssh`, `--timeout-locust`, `--timeout-prontidao`,
+`--timeout-transferencia`, `--duracao-monitor` e `--intervalo-consulta`.
+
+As sondagens ficam também na pasta da repetição. A configuração efetiva auditada
+é passada ao executor por JSON; somente os metadados recém-criados desta tentativa
+são enriquecidos com a verificação e a sondagem posterior. Os horários originais
+continuam intactos. Faixas de offset antes/depois sem sobreposição impedem tratar
+o resultado como definitivo; isso aponta incerteza/deriva, sem inventar correção.
+O consolidado precisa conter latências individuais e recursos válidos. Avisos
+de CPU global inconsistente são preservados no resumo e no manifesto.
+
+### Interrupções, retomada e isolamento
+
+Falha inesperada, código Locust não zero, timeout ou Ctrl+C interrompe a sequência.
+Somente a árvore local criada pelo orquestrador e seu monitor remoto podem receber
+sinais. O controle remoto comprova PID, instante de criação e comando; se houver
+dúvida, recusa encerramento. Nunca sinaliza o PID principal das APIs.
+
+Há reserva exclusiva local em `.temp/poi_orquestrador.lock` e remota em
+`.temp/poi_experimentos.lock`. Também bloqueia geradores Locust detectados no
+host e monitores ativos na VM. A reserva dura até concluir a execução sequencial;
+nenhum próximo teste começa enquanto o monitor anterior estiver ativo. Somente
+as reservas criadas pelo próprio controlador são removidas automaticamente.
+
+Para retomar a mesma campanha, use `--retomar`. Resultados concluídos só são
+pulados após conferir hashes dos artefatos. Planos ainda não iniciados podem
+prosseguir. Tentativas em andamento, falhas ou interrompidas não são reaproveitadas:
+escolha identificação nova por `--tentativa 2`, preservando R1001 e criando R1011:
+
+```powershell
+.\.venv\Scripts\python.exe scripts/experimentacao/orquestrar.py --planejar --id-execucao definitivos_C4 --retomar --cenario C4 --aplicacao cpu --usuarios 1 --repeticao 1 --tentativa 2
+```
+
+A execução dessa nova tentativa requer novamente `--executar` e confirmação do
+provisionamento. Não há retomada de carga pela metade nem cópia sobre arquivos
+parciais. O índice mantém as tentativas anteriores separadas.
+
+Limitações: configure manualmente VirtualBox, servidores, encaminhamento de portas,
+autenticação SSH por chave/agente e confiança no host SSH. Não salva senhas nem
+desativa validação de host. O código suporta Uvicorn padrão com workers
+`multiprocessing`; launchers diferentes, acesso negado ao `/proc` ou código
+modificado exigem intervenção. A auditoria de arquivos/ambiente não inspeciona
+objetos Python na memória: preserve arquivos e reinicie após atualizações.
+Tráfego de outros computadores não pode ser excluído automaticamente: reserve
+a VM para o experimento. Contadores de disco são da VM inteira e não I/O exclusivo
+da API ou escrita física do host.
+
+Se SSH cair durante lançamento ou encerramento, o manifesto salva o token e o
+aviso; uma reserva pode permanecer. Inspecione o processo e o journal remoto
+`.temp/orquestracao/<token>/controle.json` antes de qualquer remoção manual.
+Não considere ausência de resposta SSH prova de que o processo terminou. Arquivos
+parciais permanecem para diagnóstico. TEMP/TMP são direcionados para `.temp` no
+ambiente dos processos Locust criados, sem configurações permanentes do Windows.
+
 ## Versionamento e publicação
 
 Versione código, testes, scripts, documentação e as cópias revisadas dos resultados
@@ -1433,7 +1596,11 @@ tests/test_analise.py
 tests/test_relogios.py
 tests/test_latencias.py
 tests/test_experimentacao.py
+tests/test_orquestrador.py
 scripts/
+  experimentacao/__init__.py
+  experimentacao/orquestrar.py
+  experimentacao/agente_linux.py
   analise/consolidar_resultados.py
   carga/.gitkeep
   carga/locustfile.py
