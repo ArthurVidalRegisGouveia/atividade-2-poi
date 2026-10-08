@@ -13,7 +13,7 @@ import time
 
 import psutil
 
-VERSION = "1.0.0"
+VERSION = "1.1.0"
 SCENARIOS = {
     "C1": {"vcpus": 1, "ram_gib": 1, "workers": 1},
     "C2": {"vcpus": 1, "ram_gib": 2, "workers": 1},
@@ -60,6 +60,7 @@ def parser():
     result.add_argument("--resultados", type=Path, default=Path("experimentos/resultados/carga"))
     result.add_argument("--memoria-detalhada", action="store_true", help="Coletar USS/PSS, com maior custo.")
     result.add_argument("--condicoes", default="", help="Notas experimentais sem segredos ou dados pessoais.")
+    result.add_argument("--diagnostico-cpu", action="store_true", help="JSONL com /proc/stat e contadores dos processos.")
     return result
 
 
@@ -71,11 +72,26 @@ class PrincipalEncerrado(Exception):
     pass
 
 
+def contadores_sistema():
+    before = time.monotonic()
+    try:
+        lines = [line for line in Path("/proc/stat").read_text(encoding="ascii").splitlines()
+                 if line.startswith("cpu")]
+        ticks = os.sysconf("SC_CLK_TCK")
+        result = {"proc_stat_cpu_linhas": lines, "clk_tck": ticks}
+    except (OSError, AttributeError, ValueError) as error:
+        result = {"erro": type(error).__name__}
+    return dict(result, utc=utc(), monotonic_before_s=before, monotonic_after_s=time.monotonic())
+
+
 class Coletor:
-    def __init__(self, pid, detailed=False):
+    def __init__(self, pid, detailed=False, diagnostic=False):
         self.root = psutil.Process(pid)
         self.identity = (pid, self.root.create_time())
         self.detailed = detailed
+        self.diagnostic = diagnostic
+        self.raw_initial = contadores_sistema() if diagnostic else None
+        self.last_raw = None
         self.previous_cpu = {}
         self.previous_ids = set()
         self.cpus = psutil.cpu_count(logical=True)
@@ -93,6 +109,7 @@ class Coletor:
             raise PrincipalEncerrado("PID principal encerrado.") from error
         stamp = utc()
         rows, current_cpu, identities = [], {}, set()
+        raw_processes = []
         for process in {p.pid: p for p in processes}.values():
             row = dict.fromkeys(PROCESS_FIELDS)
             row.update(amostra=index, utc=stamp, tempo_relativo_s=elapsed,
@@ -108,6 +125,15 @@ class Coletor:
                 observed = time.monotonic()
                 total = cpu.user + cpu.system  # Não inclui CPU dos filhos.
                 previous = self.previous_cpu.get(identity)
+                if self.diagnostic:
+                    raw = {"pid": process.pid, "criado_epoch_s": created,
+                           "cpu_times_s": cpu._asdict(), "monotonic_s": observed,
+                           "anterior": previous}
+                    try:
+                        raw.update(ppid=process.ppid(), cmdline=process.cmdline())
+                    except psutil.Error as error:
+                        raw["erro_identificacao"] = type(error).__name__
+                    raw_processes.append(raw)
                 current_cpu[identity] = (total, observed)
                 if previous and observed > previous[1]:
                     row["cpu_intervalo_real_s"] = observed - previous[1]
@@ -142,6 +168,9 @@ class Coletor:
         system["processos_adicionados"] = json.dumps(sorted(identities - self.previous_ids))
         system["processos_removidos"] = json.dumps(sorted(self.previous_ids - identities))
         self.previous_cpu, self.previous_ids = current_cpu, identities
+        if self.diagnostic:
+            self.last_raw = {"amostra": index, "utc_amostra": stamp,
+                             "sistema": contadores_sistema(), "processos": raw_processes}
         return system, rows
 
 
@@ -165,6 +194,8 @@ def executar(options, collector):
         "cpu_sistema_base": "psutil.cpu_percent(interval=None), 100% = capacidade total",
         "memoria": "bytes; RSS somado pode contar páginas compartilhadas várias vezes",
         "estado": "executando", "amostras": 0,
+        "diagnostico_cpu": options.diagnostico_cpu,
+        "contadores_brutos": "cpu_bruto.jsonl; ticks /proc/stat e segundos CPU por processo; leituras sequenciais",
     }
     metadata_path = base / "metadados.json"
 
@@ -174,6 +205,7 @@ def executar(options, collector):
     salvar()
     started = time.monotonic()
     last, deadline = started, started + options.intervalo
+    raw_file = None
     print(f"Coleta em {base}; Ctrl+C encerra sem finalizar o servidor.")
     try:
         with (base / "sistema.csv").open("x", encoding="utf-8", newline="") as system_file, \
@@ -182,6 +214,10 @@ def executar(options, collector):
             process_writer = csv.DictWriter(process_file, fieldnames=PROCESS_FIELDS)
             system_writer.writeheader()
             process_writer.writeheader()
+            if options.diagnostico_cpu:
+                raw_file = (base / "cpu_bruto.jsonl").open("x", encoding="utf-8")
+                raw_file.write(json.dumps({"tipo": "baseline", "sistema": collector.raw_initial}) + "\n")
+                raw_file.flush()
             while True:
                 now = time.monotonic()
                 if options.duracao is not None and now - started >= options.duracao:
@@ -200,6 +236,9 @@ def executar(options, collector):
                 process_writer.writerows(rows)
                 system_file.flush()
                 process_file.flush()
+                if raw_file:
+                    raw_file.write(json.dumps(collector.last_raw) + "\n")
+                    raw_file.flush()
                 metadata["amostras"] += 1
                 last = now
                 deadline += options.intervalo
@@ -214,6 +253,8 @@ def executar(options, collector):
         metadata.update(estado="erro", erro=type(error).__name__)
         raise
     finally:
+        if raw_file:
+            raw_file.close()
         metadata.update(fim_utc=utc(), tempo_parede_s=time.monotonic() - started)
         salvar()
     return base
@@ -227,7 +268,7 @@ def main(argv=None):
     if platform.system() != "Linux":
         argument_parser.error("Execute na VM Linux; testes Windows usam mocks.")
     try:
-        collector = Coletor(options.pid, options.memoria_detalhada)
+        collector = Coletor(options.pid, options.memoria_detalhada, options.diagnostico_cpu)
         executar(options, collector)
     except (psutil.Error, OSError, RuntimeError) as error:
         argument_parser.exit(1, f"Coleta não concluída: {type(error).__name__}: {error}\n")

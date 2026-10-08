@@ -840,6 +840,253 @@ de monitoramento), com apenas o aviso conhecido do Starlette sobre HTTPX.
 substitui a instalação e a verificação no Ubuntu.
 Referência das definições e limitações: [documentação oficial do psutil](https://psutil.readthedocs.io/en/latest/).
 
+## Consolidação dos resultados experimentais
+
+`scripts/analise/consolidar_resultados.py` usa somente a biblioteca padrão
+Python (3.10 ou posterior). Não executa carga e não altera os arquivos de entrada.
+Recebe uma ou mais pastas `C?/usuarios_NN/repeticao_NN` e gera uma linha por
+repetição em `consolidado.csv`, além de `resumo.txt`, numa **pasta nova**.
+Não combina repetições nem calcula uma média entre cenários automaticamente.
+Confira limite, espera, recursos e versões antes de comparar linhas.
+
+Os formatos foram conferidos nos scripts existentes, nos CSV reais do piloto
+e na implementação instalada do Locust 2.46.7. As entradas esperadas são:
+
+- `parametros.json`: identificação, parâmetros e fase `medicao` com horários UTC.
+- `medicao_stats.csv`: linha `Aggregated`, com `Request Count`, `Failure Count`,
+  `Average Response Time`, `95%` e `Requests/s`.
+- `medicao_stats_history.csv`: `Timestamp` em segundos Unix UTC, `User Count`,
+  `Total Request Count`, `Total Failure Count`, `Total Average Response Time`.
+- `medicao_console.txt`: marcadores `Resetting stats` e `--run-time limit reached`.
+- `medicao_failures.csv` e `medicao_exceptions.csv`: verificados para diagnóstico;
+  contagens vêm do histórico/resumo, sem somar novamente esses registros.
+- `monitoramento_linux/metadados.json`, `sistema.csv`, `processos.csv`, nos formatos
+  descritos na seção de monitoramento. `--monitoramento` permite informar uma
+  pasta Linux externa para uma única repetição, validando sua identificação.
+
+Os arquivos `aquecimento_*` não entram na análise. Campos/arquivos ausentes são
+listados em `avisos`; métricas impossíveis ficam vazias, sem substituir por zero.
+Identificação inconsistente, repetição duplicada ou reset de contadores dentro
+da janela interrompem a consolidação. Se falta `parametros.json` ou a fase de
+medição com horários, não é possível atribuir uma janela confiável e a análise
+é interrompida. Uma fase com erro ou incompleta é identificada nos avisos.
+
+Para excluir rampa e encerramento, informe o offset **real** do relógio local
+usado no console Windows: `--offset-log-minutos -180` significa UTC-3. Isso
+converte timestamps do console; não corrige o relógio da VM. Os marcadores de
+reset e início do encerramento delimitam candidatos. A janela efetiva vai do
+primeiro ao último snapshot `Aggregated` estritamente dentro desses limites
+com o número de usuários solicitado. Uma queda de usuários interrompe esse
+segmento; não une períodos de carga separados. São necessários dois snapshots.
+As bordas inteiras do histórico reduzem a janela em relação aos marcadores.
+
+Alternativamente, use `--inicio-utc 2026-10-08T16:00:01Z --fim-utc
+2026-10-08T16:00:09Z` para declarar limites já verificados pelo operador;
+ambos precisam estar dentro da fase de medição. Os snapshots também são
+selecionados estritamente dentro desses limites e com a demanda correta.
+Sem offset/marcadores nem limites explícitos, o resumo acumulado continua
+disponível, mas a janela e suas métricas ficam ausentes: não presume que
+início do subprocesso seja início da carga nem usa duração nominal para
+inventar o instante exato de encerramento.
+
+As amostras Linux passam pelo filtro UTC da janela. Para evitar CPU parcialmente
+fora da carga, o intervalo inteiro anterior à amostra também precisa caber
+na janela (`intervalo_real_s` ou `cpu_intervalo_real_s`). RAM utiliza as mesmas
+linhas conservadoramente filtradas. A ferramenta registra número de valores
+válidos, média aritmética entre amostras e máximo para cada métrica. Não interpola
+lacunas nem pondera médias pelo tempo: atrasos de coleta exigem cuidado.
+As médias individuais de processos são médias das linhas por processo, não a
+utilização total da aplicação; para comparar a árvore, use as colunas `cpu_arvore_*`
+e `rss_soma_*` provenientes de `sistema.csv`. RSS somado mantém a limitação
+de compartilhamento; USS/PSS ausentes continuam ausentes.
+
+| Métrica consolidada | Origem e interpretação |
+|---|---|
+| `latencia_media_snapshot_ms`, `p95_snapshot_ms`, `vazao_snapshot_rps` | Valores exportados em `medicao_stats.csv`, em ms e requisições/s; são acumulados do último CSV disponível, não necessariamente valores finais nem exclusivos da janela recortada. |
+| `req_snapshot`, `falhas_snapshot` | Contadores exportados nesse mesmo snapshot. O escritor periódico pode não ter salvo a última requisição; não corrige usando valores inventados. |
+| `req_janela`, `falhas_janela`, `sucessos_janela` | Diferença dos contadores do primeiro/último snapshot da janela; sucessos = requisições registradas menos falhas. O intervalo corresponde a completamentos observados, não necessariamente a requisições iniciadas dentro dele. |
+| `vazao_calculada_janela_rps` | `delta(Total Request Count) / delta(Timestamp)`, incluindo falhas. Não é igual à quantidade de usuários concorrentes. |
+| `latencia_media_calculada_janela_ms` | Opcional, com `--latencias-completas`: `(media_final × contagem_final − media_inicial × contagem_inicial) / delta_contagem`. Só declare se todas as requisições registradas possuem tempo de resposta; os CSV não exportam a contagem de latências ausentes. Sem essa declaração, fica vazia. |
+| `p95_janela_ms` | Indisponível: o CSV não contém distribuição completa por janela nem latências individuais. Percentis móveis do histórico não podem ser promediados para obter o p95 global. |
+| `cpu_vm_pct_*`, `cpu_arvore_capacidade_pct_*` | Percentuais da capacidade total da VM; `*_media`, `*_max`, `*_n` identificam estatística e quantidade de valores. |
+| `cpu_arvore_uma_cpu_pct_*` | Escala de uma CPU lógica: pode chegar a aproximadamente 200% em duas vCPUs. |
+| `ram_*_bytes_*`, `rss_soma_bytes_*`, `uss_soma_bytes_*`, `pss_soma_bytes_*` | Valores em bytes. Para MiB, divida por 1048576; não confunda memória usada psutil com total menos disponível. |
+
+O resumo registra parâmetros, versões disponíveis e recursos planejados/observados.
+Valores `snapshot` são extraídos dos CSV; diferenças de contagem, vazão,
+reconstrução de média e estatísticas de recursos são calculados. Não trate os
+escopos como idênticos nem compare p95 acumulado com CPU de outra janela sem
+explicitar essa limitação. Para futuros p95 exclusivos de uma janela, será
+necessária uma coleta com distribuição ou tempos individuais adequados.
+
+**Relógios:** confirme externamente a sincronização Windows/Ubuntu. Somente então
+use `--relogios-sincronizados`; o argumento registra a confirmação, não executa
+uma verificação NTP. Se mediu uma diferença constante, `--correcao-monitor-s`
+soma esse valor ao horário Linux (por exemplo, VM atrasada 2 s: valor `2`).
+Não ajuste pelo pico de CPU. O script detecta possível salto do relógio através
+de UTC versus monotônico nos metadados Windows e nas amostras Linux (aviso
+quando a diferença/variação excede 1 s). Ausência de sobreposição também gera
+aviso, mas pode significar coleta incompleta. Esses arquivos, sozinhos, não
+permitem medir uma diferença constante entre máquinas; sem confirmação,
+o alinhamento é explicitamente provisório.
+
+Exemplo com os CSV reais presentes localmente (UTC-3 do console deve ser conferido):
+
+```powershell
+.\.venv\Scripts\python.exe scripts/analise/consolidar_resultados.py experimentos/resultados/carga/C1/usuarios_01/repeticao_01 experimentos/resultados/carga/C1/usuarios_01/repeticao_02 --offset-log-minutos -180 --saida experimentos/resultados/analise/piloto_C1
+```
+
+Na preparação da ferramenta, somente os arquivos Locust dessas duas repetições
+estavam disponíveis localmente; os CSV Linux ainda precisam ser copiados da VM.
+A ausência gera avisos e células vazias de CPU/RAM, sem invalidar as métricas
+Locust que puderem ser extraídas. Após reunir a coleta correspondente, execute
+novamente com uma pasta de saída diferente. Não sobrescreva a análise anterior.
+`--monitoramento` não deve apontar para uma coleta de outra repetição.
+
+Testes usam dados sintéticos pequenos e não executam carga:
+
+O piloto local foi consolidado em `experimentos/resultados/analise/piloto_C1/`:
+cada repetição gerou uma janela de 13 s, com 13 e 12 requisições registradas
+nessas janelas e nenhuma falha. CPU/RAM permaneceram indisponíveis, pois a
+coleta Linux não estava presente. O offset do console usado foi UTC-3;
+a sincronização entre host e VM não foi declarada. Esses resultados parciais
+não constituem comparação definitiva entre cenários.
+
+```powershell
+.\.venv\Scripts\python.exe -m pytest tests/test_analise.py -q
+```
+
+## Instrumentação opcional para investigar workers, relógios e CPU
+
+As opções abaixo são restritas ao laboratório. A contagem matemática de primos
+e os corpos JSON não mudam. O padrão continua sem cabeçalhos de diagnóstico,
+com reutilização HTTP e sem contadores brutos de CPU. Memory-bound e I/O-bound
+não foram modificadas. Não houve execução de carga nesta preparação.
+
+Na VM, habilite **explicitamente** `CPU_DIAGNOSTICO=1` ao iniciar Uvicorn.
+A variável é lida na criação da aplicação: mudar seu valor exige reiniciar
+o servidor. Use somente na rede experimental; os cabeçalhos expõem PID e
+horários internos, sem autenticação adicional. Confirme que uma instância
+anterior não está ocupando a porta antes de usar este exemplo C4:
+
+```bash
+cd /caminho/atividade-2-poi
+source .venv/bin/activate
+CPU_DIAGNOSTICO=1 python -m uvicorn apps.cpu_bound.main:app --host 0.0.0.0 --port 8001 --workers 2 &
+servidor_pid=$!
+printf 'PID principal: %s\n' "$servidor_pid"
+```
+
+Quando habilitado, respostas HTTP incluem `X-Worker-PID`,
+`X-Server-Received-UTC` (entrada no middleware) e `X-Server-Sent-UTC` (emissão
+do início da resposta). Em `/health`, esses horários permitem sondar relógios
+sem executar o cálculo. Em `/primos`, o PID identifica o processo atendente.
+Os cabeçalhos também acompanham erros HTTP. Sem a variável, não são adicionados.
+
+Antes da carga, no Windows, faça uma verificação explícita e curta de relógio:
+
+```powershell
+.\.venv\Scripts\python.exe scripts/monitoramento/verificar_relogios.py --url http://127.0.0.1:8001 --amostras 5 --saida .temp/relogio_C4_r91.json
+```
+
+Este comando realiza até cinco chamadas `/health`, com conexão fechada após
+cada chamada, fora das estatísticas do Locust. O arquivo deve ser novo. O script
+registra falhas de rede/cabeçalhos; retorna código 1 se nenhuma sondagem for
+válida. Os quatro horários são T1 (cliente envia), T2 (servidor recebe), T3
+(servidor emite cabeçalhos), T4 (cliente termina leitura). São timestamps UTC;
+o RTT também é medido com relógio monotônico. Um ajuste perceptível do relógio
+durante a sondagem ou horários inconsistentes invalidam a amostra.
+
+O offset definido é **servidor menos cliente**. Com atrasos não negativos e
+offset aproximadamente constante durante a chamada, o intervalo admissível é
+`[T3 − T4, T2 − T1]`. O ponto médio é uma estimativa que assume trânsito
+simétrico; metade da faixa expressa a incerteza dessa suposição, não um intervalo
+estatístico de confiança. Agendamento e leitura da resposta entram no atraso.
+O JSON preserva todas as sondagens e destaca a menor faixa; não ajusta relógios
+nem confirma sincronização automaticamente. Repita antes/depois da carga com
+arquivos distintos para procurar deriva. RTT baixo não comprova sincronização.
+
+Para alinhar o Linux ao Windows na análise, some o **negativo** do offset
+servidor-cliente. Exemplo puramente sintético: offset estimado −3 s significa
+VM atrasada; use `--correcao-monitor-s 3`, mantendo explícita a incerteza.
+Não use esse exemplo como medição da VM. A decisão de declarar
+`--relogios-sincronizados` exige evidência externa e tolerância definida.
+
+Inicie o monitoramento na VM antes do aquecimento. `--diagnostico-cpu` adiciona
+`cpu_bruto.jsonl`, sem mudar colunas ou semântica de `sistema.csv`/`processos.csv`:
+
+```bash
+python scripts/monitoramento/monitorar_linux.py --pid "$servidor_pid" --cenario C4 --usuarios 2 --repeticao 91 --intervalo 1 --duracao 120 --diagnostico-cpu --resultados experimentos/resultados/carga --condicoes 'C4; 2 workers; CPU_DIAGNOSTICO=1; limite=250000; espera=0; conexoes=fechar'
+```
+
+Se usar outro terminal, informe o PID real no lugar da variável. A duração deve
+cobrir repouso inicial, aquecimento, medição e encerramento. Os registros brutos
+contêm baseline do sistema, linhas `cpu`/`cpuN` de `/proc/stat`, `CLK_TCK`, UTC
+e leituras monotônicas antes/depois; por processo, PID/data de criação, PPID,
+linha de comando, `cpu_times()` em segundos, instante monotônico e referência
+anterior `(user+system, monotônico)`. Falta de acesso à identificação é registrada.
+O diagnóstico acrescenta leitura e escrita: use-o de maneira comparável entre
+cenários e revise linhas de comando antes de publicar, pois argumentos podem
+conter informações locais.
+
+Para conferir a CPU dos processos, use `100 × delta(user+system) / delta(monotônico)`;
+não some `children_user`/`children_system`. Divida por CPUs lógicas para obter
+capacidade da VM. Para o sistema, os campos Linux de `/proc/stat` são ticks:
+`user nice system idle iowait irq softirq steal guest guest_nice`, conforme
+suporte do kernel. Na definição psutil, total exclui duplicação de `guest` e
+`guest_nice`; ocupado = total − idle − iowait. CPU global é
+`100 × delta(ocupado) / delta(total)`. Use deltas consecutivos dos contadores,
+considerando valores negativos como problema de contabilização; psutil os
+limita a zero internamente. Os snapshots brutos são independentes, próximos
+das chamadas psutil, mas não atômicos nem os snapshots internos exatos da API.
+Eles permitem confrontar crescimento dos ticks, tempo de parede e tempos dos
+processos; não demonstram antecipadamente a causa da discrepância observada.
+
+No Windows, o executor agora aceita `--conexoes reutilizar` (padrão) ou
+`--conexoes fechar` (envia `Connection: close`). A segunda opção solicita ao
+servidor o encerramento após a resposta, acrescentando estabelecimento de
+conexões às latências. Não garante distribuição uniforme, nem um usuário por
+worker. Compare ambos os modos com o mesmo limite, demanda, espera e recursos,
+em repetições distintas. Não mude o modo durante uma execução.
+
+Exemplo completo para uma futura repetição de diagnóstico, depois de revisar
+relógios e iniciar o monitor na VM; **não foi executado nesta preparação**:
+
+```powershell
+.\.venv\Scripts\python.exe scripts/carga/executar_locust.py --url http://127.0.0.1:8001 --cenario C4 --usuarios 2 --taxa 2 --duracao 40 --aquecimento 10 --limite 250000 --espera 0 --repeticao 91 --conexoes fechar --registrar-worker-pid --verificacao-relogio .temp/relogio_C4_r91.json
+```
+
+Use `--somente-preparar` para registrar o plano sem enviar requisições. Não
+inicie uma repetição preparada na mesma pasta: escolha um novo número. Para
+o modo padrão, omita `--conexoes` ou informe `reutilizar`. A verificação de
+relógio é anexada aos metadados para auditoria, sem aplicar correção automática.
+Confira URL, idade e condições das sondagens antes de usá-las.
+
+Cada fase gera `aquecimento_instrumentacao.json` ou `medicao_instrumentacao.json`
+e o executor também incorpora esses dados em `parametros.json`. Os eventos
+registram `fase_inicio_utc`, `usuarios_prontos_utc` (após o reset no runner
+local), `encerramento_inicio_utc` e `fase_fim_utc`. A análise prefere os marcos
+diretos entre usuários prontos e início do encerramento; limites explícitos
+continuam tendo prioridade. Os dados anteriores continuam usando console e
+offset declarado. Os horários externos do subprocesso permanecem nos metadados.
+
+Com `--registrar-worker-pid`, contadores em memória registram PID/status HTTP.
+`pids_janela` cobre completamentos após usuários prontos e antes do encerramento;
+`pids_apos_encerramento` inclui completamentos durante a drenagem. O contador
+é reiniciado ao terminar a rampa e salvo somente nos eventos, sem arquivo por
+requisição. Cabeçalho ausente/inválido aparece como `ausente_ou_invalido`, sem
+inventar PID. Status HTTP 200 não comprova validação JSON bem-sucedida: os
+contadores são de respostas HTTP, e falhas de conteúdo continuam no Locust.
+Requisições que atravessam uma fronteira temporal são contabilizadas ao completar.
+Essa instrumentação foi preparada para Locust local, sem distribuição master/worker.
+
+Novos testes usam mocks e respostas locais pequenas, sem carga contra a VM.
+Nesta etapa, 159 testes passaram, com apenas o aviso conhecido do Starlette;
+`pip check` não encontrou incompatibilidades. A comparação por AST confirmou
+que `contar_primos`, `primos` e `health` mantêm seus corpos anteriores.
+Continuam pendentes a verificação experimental dos relógios, a associação real
+das conexões aos workers e a reconciliação dos contadores de CPU no VirtualBox.
+
 ## Versionamento e publicação
 
 Versione código, testes, scripts, documentação e as cópias revisadas dos resultados
@@ -890,7 +1137,10 @@ tests/test_memory.py
 tests/test_io.py
 tests/test_carga.py
 tests/test_monitoramento.py
+tests/test_analise.py
+tests/test_relogios.py
 scripts/
+  analise/consolidar_resultados.py
   carga/.gitkeep
   carga/locustfile.py
   carga/executar_locust.py
@@ -898,6 +1148,7 @@ scripts/
   monitoramento/verificar_memoria_windows.py
   monitoramento/verificar_io_windows.py
   monitoramento/monitorar_linux.py
+  monitoramento/verificar_relogios.py
 experimentos/
   resultados/.gitkeep
   resultados/README.md

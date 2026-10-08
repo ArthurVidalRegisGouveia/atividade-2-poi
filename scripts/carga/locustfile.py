@@ -2,6 +2,10 @@
 
 import argparse
 import math
+from collections import Counter
+from datetime import datetime, timezone
+import json
+from pathlib import Path
 
 from locust import HttpUser, events, task
 
@@ -26,6 +30,59 @@ def argumentos(parser, **kwargs):
                         help="Mesmo limite inclusivo em todos os cenários.")
     parser.add_argument("--espera", type=espera_valida, default=1.0,
                         help="Segundos fixos após cada resposta; 0 = sem pausa.")
+    parser.add_argument("--conexoes", choices=("reutilizar", "fechar"), default="reutilizar")
+    parser.add_argument("--registrar-worker-pid", action="store_true")
+    parser.add_argument("--diagnostico-saida", help="JSON de marcos/contagem; executor define por fase.")
+
+
+@events.init.add_listener
+def instrumentar(environment, **kwargs):
+    options = environment.parsed_options
+    path = getattr(options, "diagnostico_saida", None)
+    if path and Path(path).exists():
+        raise ValueError("Arquivo de instrumentação já existe.")
+    environment.worker_counts = Counter()
+    environment.instrumentacao = {"conexoes": getattr(options, "conexoes", "reutilizar"),
+                                  "registrar_worker_pid": getattr(options, "registrar_worker_pid", False)}
+
+    def save():
+        if path:
+            Path(path).parent.mkdir(parents=True, exist_ok=True)
+            Path(path).write_text(json.dumps(environment.instrumentacao, indent=2) + "\n", encoding="utf-8")
+
+    def mark(field):
+        environment.instrumentacao[field] = datetime.now(timezone.utc).isoformat()
+        save()
+
+    def started(**kw):
+        environment.worker_counts.clear()
+        mark("fase_inicio_utc")
+
+    def ready(**kw):
+        # Listener registrado em init, após o listener de reset do runner local.
+        environment.worker_counts.clear()
+        mark("usuarios_prontos_utc")
+
+    def stopping(**kw):
+        environment.instrumentacao["pids_janela"] = dict(environment.worker_counts)
+        mark("encerramento_inicio_utc")
+
+    def stopped(**kw):
+        environment.instrumentacao["pids_apos_encerramento"] = dict(environment.worker_counts)
+        mark("fase_fim_utc")
+
+    environment.events.test_start.add_listener(started)
+    environment.events.spawning_complete.add_listener(ready)
+    environment.events.test_stopping.add_listener(stopping)
+    environment.events.test_stop.add_listener(stopped)
+
+
+def registrar_pid(environment, response):
+    if not getattr(environment.parsed_options, "registrar_worker_pid", False):
+        return
+    pid = response.headers.get("X-Worker-PID", "")
+    key = str(int(pid)) if len(pid) <= 12 and pid.isascii() and pid.isdecimal() and int(pid) > 0 else "ausente_ou_invalido"
+    environment.worker_counts[f"{key}/HTTP_{response.status_code}"] += 1
 
 
 class UsuarioCPU(HttpUser):
@@ -35,10 +92,12 @@ class UsuarioCPU(HttpUser):
     @task
     def primos(self):
         limite = self.environment.parsed_options.limite
+        headers = {"Connection": "close"} if getattr(self.environment.parsed_options, "conexoes", "reutilizar") == "fechar" else {}
         with self.client.get(
             "/primos", params={"limite": limite}, name="/primos",
-            timeout=30, catch_response=True,
+            timeout=30, catch_response=True, headers=headers,
         ) as response:
+            registrar_pid(self.environment, response)
             if response.status_code != 200:
                 response.failure(f"HTTP {response.status_code}")
                 return

@@ -2,6 +2,7 @@
 
 import csv
 import json
+from collections import namedtuple
 from types import SimpleNamespace
 
 import pytest
@@ -24,7 +25,7 @@ class Processo:
         return self.children_list
     def cpu_times(self):
         if self.denied: raise psutil.AccessDenied(self.pid)
-        return SimpleNamespace(user=self.cpu, system=0, children_user=999)
+        return namedtuple("Cpu", "user system children_user")(self.cpu, 0, 999)
     def memory_info(self):
         if not self.alive: raise psutil.NoSuchProcess(self.pid)
         return SimpleNamespace(rss=100, vms=200)
@@ -180,3 +181,25 @@ def test_arquivo_no_caminho_de_saida(environment, tmp_path):
     with pytest.raises(OSError):
         monitor.executar(options(tmp_path), monitor.Coletor(42))
     assert (tmp_path / "C1").read_text(encoding="utf-8") == "preservar"
+
+
+def test_diagnostico_bruto_opcional(environment, tmp_path, monkeypatch):
+    root, clock = environment
+    for process in [root, *root.children_list]:
+        monkeypatch.setattr(process, "ppid", lambda: 1, raising=False)
+        monkeypatch.setattr(process, "cmdline", lambda: ["python", "uvicorn"], raising=False)
+    monkeypatch.setattr(monitor, "contadores_sistema", lambda: {
+        "proc_stat_cpu_linhas": ["cpu 1 0 2 100 0 0 0 0 0 0"], "clk_tck": 100,
+        "monotonic_before_s": clock.value, "monotonic_after_s": clock.value})
+    monkeypatch.setattr(monitor.time, "sleep", lambda seconds: setattr(clock, "value", clock.value + seconds))
+    args = options(tmp_path)
+    args.diagnostico_cpu = True
+    base = monitor.executar(args, monitor.Coletor(42, diagnostic=True))
+    records = [json.loads(line) for line in (base / "cpu_bruto.jsonl").read_text().splitlines()]
+    assert len(records) == 3
+    assert records[0]["tipo"] == "baseline"
+    assert records[1]["processos"][0]["pid"] == 42
+    assert records[1]["processos"][0]["ppid"] == 1
+    assert records[1]["processos"][0]["cpu_times_s"]["children_user"] == 999
+    assert records[2]["processos"][0]["anterior"] == [0, 1]
+    assert json.loads((base / "metadados.json").read_text())["diagnostico_cpu"]

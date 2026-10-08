@@ -1,5 +1,7 @@
 from pathlib import Path
 import runpy
+import os
+from datetime import datetime
 
 import pytest
 from fastapi.testclient import TestClient
@@ -90,3 +92,23 @@ def test_configuracao_invalida(monkeypatch, valor):
 
     with pytest.raises(ValueError):
         runpy.run_path(str(Path(__file__).parents[1] / "apps/cpu_bound/main.py"))
+
+
+@pytest.mark.parametrize("enabled", [False, True])
+def test_diagnostico_opcional(monkeypatch, enabled):
+    monkeypatch.setenv("CPU_DIAGNOSTICO", "1" if enabled else "0")
+    module = runpy.run_path(str(Path(__file__).parents[1] / "apps/cpu_bound/main.py"))
+    with TestClient(module["app"]) as client:
+        for path in ("/health", "/primos?limite=10", "/primos?limite=0"):
+            response = client.get(path)
+            if enabled:
+                assert response.headers["X-Worker-PID"] == str(os.getpid())
+                received = datetime.fromisoformat(response.headers["X-Server-Received-UTC"])
+                sent = datetime.fromisoformat(response.headers["X-Server-Sent-UTC"])
+                assert received.tzinfo is not None and received <= sent
+            else:
+                assert "X-Worker-PID" not in response.headers
+                assert "X-Server-Sent-UTC" not in response.headers
+        assert client.get("/health").json() == {"status": "ok"}
+        assert client.get("/primos?limite=10").json() == {
+            "tipo": "CPU-bound", "limite": 10, "quantidade_primos": 4}

@@ -1,6 +1,7 @@
 """API para experimentos acadêmicos com carga de CPU."""
 
 import os
+from datetime import datetime, timezone
 from math import isqrt
 from typing import Literal
 
@@ -16,6 +17,34 @@ if LIMITE_MAXIMO < 1:
 LIMITE_PADRAO = min(100000, LIMITE_MAXIMO)
 
 app = FastAPI(title="Aplicação CPU-bound")
+
+
+class DiagnosticoExperimental:
+    """Cabeçalhos opcionais, sem alterar corpo ou processamento matemático."""
+
+    def __init__(self, app):
+        self.app = app
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] != "http":
+            return await self.app(scope, receive, send)
+        received = datetime.now(timezone.utc).isoformat().encode("ascii")
+
+        async def diagnostic_send(message):
+            if message["type"] == "http.response.start":
+                message = dict(message)
+                message["headers"] = list(message.get("headers", [])) + [
+                    (b"x-worker-pid", str(os.getpid()).encode("ascii")),
+                    (b"x-server-received-utc", received),
+                    (b"x-server-sent-utc", datetime.now(timezone.utc).isoformat().encode("ascii")),
+                ]
+            await send(message)
+
+        await self.app(scope, receive, diagnostic_send)
+
+
+if os.getenv("CPU_DIAGNOSTICO", "0") == "1":
+    app.add_middleware(DiagnosticoExperimental)
 
 
 class RespostaPrimos(BaseModel):

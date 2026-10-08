@@ -46,6 +46,9 @@ def parser():
     result.add_argument("--espera", type=numero, default=1.0)
     result.add_argument("--repeticao", type=positivo, default=1)
     result.add_argument("--somente-preparar", action="store_true", help="Registra plano sem enviar HTTP.")
+    result.add_argument("--conexoes", choices=("reutilizar", "fechar"), default="reutilizar")
+    result.add_argument("--registrar-worker-pid", action="store_true")
+    result.add_argument("--verificacao-relogio", help="JSON de sondagens realizado antes da carga.")
     return result
 
 
@@ -64,14 +67,18 @@ def validar(options, argument_parser):
 
 def comando(options, phase, directory):
     seconds = options.aquecimento if phase == "aquecimento" else options.duracao
-    return [
+    command = [
         sys.executable, "-m", "locust", "-f", str(ROOT / "scripts/carga/locustfile.py"),
         "--headless", "--host", options.url, "--users", str(options.usuarios),
         "--spawn-rate", str(options.taxa), "--run-time", f"{seconds}s",
         "--limite", str(options.limite), "--espera", str(options.espera),
         "--reset-stats", "--csv", str(directory / phase), "--csv-full-history",
         "--only-summary", "--stop-timeout", "35", "--exit-code-on-error", "1",
+        "--conexoes", options.conexoes, "--diagnostico-saida", str(directory / f"{phase}_instrumentacao.json"),
     ]
+    if options.registrar_worker_pid:
+        command.append("--registrar-worker-pid")
+    return command
 
 
 def agora():
@@ -82,6 +89,12 @@ def main(argv=None):
     argument_parser = parser()
     options = argument_parser.parse_args(argv)
     validar(options, argument_parser)
+    clock_check = None
+    if options.verificacao_relogio:
+        clock_check = json.loads(Path(options.verificacao_relogio).read_text(encoding="utf-8"))
+        if (not isinstance(clock_check, dict) or not isinstance(clock_check.get("menor_incerteza"), dict)
+                or clock_check.get("url", "").rstrip("/") != options.url.rstrip("/")):
+            argument_parser.error("Verificação de relógio sem sondagem válida ou de outra URL.")
     directory = (ROOT / "experimentos/resultados/carga" / options.cenario
                  / f"usuarios_{options.usuarios:02d}" / f"repeticao_{options.repeticao:02d}")
     # Nunca sobrescreve uma repetição preexistente, inclusive um plano preparado.
@@ -95,6 +108,7 @@ def main(argv=None):
         "duracoes_incluem_rampa": True,
         "aquecimento_em_processo_separado": True,
         "criado_utc": agora(), "fases": [],
+        "verificacao_relogio": clock_check,
     }
     path = directory / "parametros.json"
 
@@ -121,6 +135,11 @@ def main(argv=None):
                 completed = subprocess.run(command, cwd=ROOT, stdout=output,
                                            stderr=subprocess.STDOUT, check=False)
             entry.update(estado="concluido", codigo_saida=completed.returncode)
+            diagnostic = directory / f"{phase}_instrumentacao.json"
+            if diagnostic.is_file():
+                entry["instrumentacao"] = json.loads(diagnostic.read_text(encoding="utf-8"))
+            else:
+                entry["aviso_instrumentacao"] = "Marcos diretos ausentes; compatibilidade com console mantida."
         except (OSError, KeyboardInterrupt) as error:
             entry.update(estado="interrompido", erro=type(error).__name__)
             raise

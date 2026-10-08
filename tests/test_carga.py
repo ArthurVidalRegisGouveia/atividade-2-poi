@@ -81,6 +81,7 @@ parser = argparse.ArgumentParser()
 module["argumentos"](parser)
 assert parser.parse_args([]).limite == 100000
 assert parser.parse_args(["--limite", "10", "--espera", "0"]).espera == 0
+assert parser.parse_args([]).conexoes == "reutilizar"
 for converter, value in [("inteiro_positivo", "0"), ("espera_valida", "nan")]:
     try:
         module[converter](value)
@@ -102,6 +103,7 @@ class Client:
         assert path == "/primos"
         assert kwargs["params"] == {"limite": 10}
         assert kwargs["timeout"] == 30
+        assert kwargs["headers"] == ({"Connection": "close"} if getattr(user.environment.parsed_options, "conexoes", "reutilizar") == "fechar" else {})
         return response
 user = SimpleNamespace(client=Client(), environment=SimpleNamespace(
     parsed_options=SimpleNamespace(limite=10, espera=1.5)))
@@ -115,8 +117,82 @@ for status, data, failed in [
     response = Response(status, data)
     module["UsuarioCPU"].primos(user)
     assert bool(response.errors) == failed
+from collections import Counter
+user.environment.parsed_options.conexoes = "fechar"
+user.environment.parsed_options.registrar_worker_pid = True
+user.environment.worker_counts = Counter()
+response = Response(200, {"tipo": "CPU-bound", "limite": 10, "quantidade_primos": 4})
+response.headers = {"X-Worker-PID": "1165"}
+module["UsuarioCPU"].primos(user)
+assert user.environment.worker_counts["1165/HTTP_200"] == 1
+response.headers = {}
+module["UsuarioCPU"].primos(user)
+assert user.environment.worker_counts["ausente_ou_invalido/HTTP_200"] == 1
+import tempfile, json
+from pathlib import Path
+from locust.event import Events
+with tempfile.TemporaryDirectory() as directory:
+    env = SimpleNamespace(events=Events(), parsed_options=SimpleNamespace(
+        diagnostico_saida=str(Path(directory)/"marcos.json"), conexoes="fechar", registrar_worker_pid=True))
+    module["instrumentar"](env)
+    env.events.test_start.fire()
+    env.worker_counts["rampa"] = 1
+    env.events.spawning_complete.fire(user_count=2)
+    assert not env.worker_counts
+    env.worker_counts["1165/HTTP_200"] = 3
+    env.events.test_stopping.fire()
+    env.worker_counts["1165/HTTP_200"] += 1
+    env.events.test_stop.fire()
+    data = json.loads(Path(directory,"marcos.json").read_text())
+    assert data["pids_janela"]["1165/HTTP_200"] == 3
+    assert data["pids_apos_encerramento"]["1165/HTTP_200"] == 4
+    assert all(data[field].endswith("+00:00") for field in (
+        "fase_inicio_utc", "usuarios_prontos_utc", "encerramento_inicio_utc", "fase_fim_utc"))
 '''
     root = Path(__file__).resolve().parents[1]
     completed = subprocess.run([sys.executable, "-c", script], cwd=root,
                                capture_output=True, text=True, timeout=30)
     assert completed.returncode == 0, completed.stderr
+
+
+@pytest.mark.parametrize("mode", ["reutilizar", "fechar"])
+def test_parametros_conexao_e_metadados(tmp_path, monkeypatch, mode):
+    monkeypatch.setattr(carga, "ROOT", tmp_path)
+    monkeypatch.setattr(carga, "version", lambda _: "teste")
+    carga.main(["--cenario", "C4", "--usuarios", "2", "--conexoes", mode,
+                "--registrar-worker-pid", "--somente-preparar"])
+    path = tmp_path / "experimentos/resultados/carga/C4/usuarios_02/repeticao_01/parametros.json"
+    data = json.loads(path.read_text(encoding="utf-8"))
+    assert data["parametros"]["conexoes"] == mode
+    assert data["parametros"]["registrar_worker_pid"]
+    assert "--registrar-worker-pid" in data["fases"][0]["comando"]
+    assert "--diagnostico-saida" in data["fases"][0]["comando"]
+
+
+def test_executor_incorpora_marcos_e_relogio(tmp_path, monkeypatch):
+    monkeypatch.setattr(carga, "ROOT", tmp_path)
+    monkeypatch.setattr(carga, "version", lambda _: "teste")
+    clock_file = tmp_path / "relogio.json"
+    clock_file.write_text(json.dumps({"url": "http://127.0.0.1:8001", "menor_incerteza": {
+        "offset_estimado_s": -3, "incerteza_meia_faixa_s": .1}}), encoding="utf-8")
+
+    def fake_run(command, **kwargs):
+        path = Path(command[command.index("--diagnostico-saida") + 1])
+        path.write_text(json.dumps({"usuarios_prontos_utc": carga.agora(),
+                                   "encerramento_inicio_utc": carga.agora()}), encoding="utf-8")
+        return subprocess.CompletedProcess(command, 0)
+
+    monkeypatch.setattr(carga.subprocess, "run", fake_run)
+    carga.main(["--cenario", "C4", "--usuarios", "2", "--verificacao-relogio", str(clock_file)])
+    metadata = json.loads((tmp_path / "experimentos/resultados/carga/C4/usuarios_02/repeticao_01/parametros.json").read_text())
+    assert metadata["verificacao_relogio"]["menor_incerteza"]["offset_estimado_s"] == -3
+    assert all("instrumentacao" in phase for phase in metadata["fases"])
+
+
+def test_relogio_de_outro_alvo_rejeitado(tmp_path, monkeypatch):
+    monkeypatch.setattr(carga, "ROOT", tmp_path)
+    clock_file = tmp_path / "relogio.json"
+    clock_file.write_text(json.dumps({"url": "http://outro:8001", "menor_incerteza": {}}))
+    with pytest.raises(SystemExit):
+        carga.main(["--cenario", "C4", "--usuarios", "2", "--verificacao-relogio", str(clock_file)])
+    assert not (tmp_path / "experimentos").exists()
