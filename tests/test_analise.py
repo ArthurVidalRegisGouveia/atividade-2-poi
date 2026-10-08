@@ -198,3 +198,138 @@ def test_janela_prefere_marcos_diretos_sem_console(run):
     row = analysis.consolidar(run, options(inicio_utc=None, fim_utc=None))
     assert row["req_janela"] == 6
     assert row["origem_janela"] == "marcos UTC diretos do Locust"
+
+
+def alterar_metadata(run, **updates):
+    path = run / "parametros.json"
+    data = json.loads(path.read_text(encoding="utf-8"))
+    data.update(updates)
+    path.write_text(json.dumps(data), encoding="utf-8")
+    return data
+
+
+@pytest.mark.parametrize("offset,shift,n", [(-2, 2, 4), (2, -2, 3)])
+def test_offset_automatico_convencao_sinais(run, offset, shift, n):
+    alterar_metadata(run, verificacao_relogio={"url": "http://localhost:8001", "coletado_utc": "2026-10-08T15:59:59Z",
+                     "menor_incerteza": {"offset_estimado_s": offset, "incerteza_meia_faixa_s": .01}})
+    row = analysis.consolidar(run, options(correcao_monitor_s=None, relogios_sincronizados=False))
+    assert row["correcao_monitor_s"] == shift
+    assert row["incerteza_offset_s"] == .01
+    assert row["idade_sondagem_inicio_medicao_s"] == 1
+    assert row["amostras_sistema"] == n
+    assert "assume offset constante" in row["avisos"]
+    # Override explícito 0 preserva a possibilidade de análise sem correção.
+    assert analysis.consolidar(run, options())["correcao_monitor_s"] == 0
+
+
+@pytest.mark.parametrize("probe", [{}, {"offset_estimado_s": "nan", "incerteza_meia_faixa_s": 1},
+                                    {"offset_estimado_s": -2, "incerteza_meia_faixa_s": -1}])
+def test_sondagem_ausente_invalida(run, probe):
+    alterar_metadata(run, verificacao_relogio={"url": "http://localhost:8001", "menor_incerteza": probe})
+    row = analysis.consolidar(run, options(correcao_monitor_s=None))
+    assert row["correcao_monitor_s"] == 0
+    assert "alinhamento temporal não comprovado" in row["avisos"]
+
+
+def adicionar_latencias(run, complete=True):
+    data = json.loads((run / "parametros.json").read_text(encoding="utf-8"))
+    data["fases"][1]["instrumentacao"] = {
+        "usuarios_prontos_utc": "2026-10-08T16:00:01Z", "encerramento_inicio_utc": "2026-10-08T16:00:09Z",
+        "latencias": {"completo": complete, "registros": 20}}
+    alterar_metadata(run, fases=data["fases"])
+    # 20 eventos entre 2 e 8; p95 posto 19, média 10.5. Nenhum aquecimento.
+    rows = [{"concluida_utc": f"2026-10-08T16:00:05.{i:06d}Z", "latencia_ms": i,
+             "falha": int(i == 20)} for i in range(1, 21)]
+    write_csv(run / "medicao_latencias.csv", rows)
+    return rows
+
+
+def test_latencias_exatas_media_p95_e_snapshots_separados(run):
+    adicionar_latencias(run)
+    row = analysis.consolidar(run, options(latencias_completas=False))
+    assert row["latencia_media_calculada_janela_ms"] == 10.5
+    assert row["p95_janela_ms"] == 19
+    assert row["p95_snapshot_ms"] == 90
+    assert row["req_hist_janela"] == 6
+    assert row["req_janela"] == 20
+    assert row["falhas_janela"] == 1
+    assert row["vazao_calculada_janela_rps"] == 2.5  # eventos / 8 s, não usuários.
+    assert row["duracao_janela_s"] == 8
+    assert "Média de latência da janela não calculada" not in row["avisos"]
+
+
+def test_recorte_eventos_e_percentil_pequeno(run):
+    rows = adicionar_latencias(run)
+    rows[0]["concluida_utc"] = "2026-10-08T16:00:01Z"  # borda inicial excluída
+    rows[-1]["concluida_utc"] = "2026-10-08T16:00:09Z"  # fim de outro recorte
+    write_csv(run / "medicao_latencias.csv", rows)
+    row = analysis.consolidar(run, options(fim_utc="2026-10-08T16:00:08Z"))
+    assert row["latencias_janela_n"] == 18
+    assert row["latencia_media_calculada_janela_ms"] == 10.5
+    assert row["p95_janela_ms"] == 19  # ceil(.95*18)=18
+
+
+def test_recorte_nao_inclui_rampa(run):
+    adicionar_latencias(run)
+    with pytest.raises(analysis.DadosInvalidos, match="rampa"):
+        analysis.consolidar(run, options(inicio_utc="2026-10-08T16:00:00Z"))
+
+
+def test_sem_eventos_na_janela_nao_inventa_latencia(run):
+    rows = adicionar_latencias(run)
+    for row in rows:
+        row["concluida_utc"] = "2026-10-08T16:00:09Z"
+    write_csv(run / "medicao_latencias.csv", rows)
+    row = analysis.consolidar(run, options(fim_utc="2026-10-08T16:00:08Z"))
+    assert row["req_janela"] == 0
+    assert row["p95_janela_ms"] is None
+    assert row["latencia_media_calculada_janela_ms"] is None
+
+
+def test_sondagem_outro_alvo_nao_aplicada(run):
+    alterar_metadata(run, verificacao_relogio={"url": "http://outra-vm:8001", "menor_incerteza": {
+        "offset_estimado_s": -2, "incerteza_meia_faixa_s": .01}})
+    row = analysis.consolidar(run, options(correcao_monitor_s=None))
+    assert row["correcao_monitor_s"] == 0
+
+
+@pytest.mark.parametrize("mode", ["incompleto", "latencia_ausente", "timestamp_invalido", "contagem"])
+def test_dados_individuais_incompletos_nao_inventam_percentil(run, mode):
+    rows = adicionar_latencias(run, complete=mode != "incompleto")
+    if mode == "latencia_ausente":
+        rows[0]["latencia_ms"] = ""
+    elif mode == "timestamp_invalido":
+        rows[0]["concluida_utc"] = "2026-10-08T16:00:05"  # sem UTC
+    elif mode == "contagem":
+        rows.pop()
+    write_csv(run / "medicao_latencias.csv", rows)
+    row = analysis.consolidar(run, options(latencias_completas=False))
+    assert row["p95_janela_ms"] is None
+    assert row["latencia_media_calculada_janela_ms"] is None
+
+
+def test_deltas_cpu_normalizacao_e_incompatibilidade_global(tmp_path):
+    path = tmp_path / "cpu_bruto.jsonl"
+    baseline = {"tipo": "baseline", "sistema": {"proc_stat_cpu_linhas": ["cpu 0 0 0 0 0 0 0 0 0 0"],
+                "utc": "2026-10-08T16:00:02Z", "monotonic_after_s": 2, "clk_tck": 100}}
+    record = {"amostra": 1, "sistema": {"proc_stat_cpu_linhas": ["cpu 20 0 0 30 0 0 0 0 0 0"],
+              "utc": "2026-10-08T16:00:03Z", "monotonic_after_s": 3, "clk_tck": 100},
+              "processos": [{"pid": 42, "criado_epoch_s": 1, "anterior": [1, 2],
+                             "monotonic_s": 3, "cpu_times_s": {"user": 1.8, "system": 0, "children_user": 999}}]}
+    path.write_text(json.dumps(baseline) + "\n" + json.dumps(record) + "\n", encoding="utf-8")
+    rows = [{"amostra": "1", "pid": "42", "criado_epoch_s": "1", "cpu_uma_cpu_pct": 80,
+             "cpu_capacidade_vm_pct": 40, "cpu_intervalo_real_s": 1}]
+    output, warnings = {}, []
+    analysis.verificar_cpu_bruto(path, rows, analysis.instante("2026-10-08T16:00:02Z"),
+                                 analysis.instante("2026-10-08T16:00:04Z"), 0, 2, output, warnings)
+    assert output["cpu_bruto_processos_n"] == 1
+    assert output["cpu_bruto_processos_erro_max_pp"] < 1e-12
+    assert output["cpu_bruto_processos_tempo_s"] == pytest.approx(.8)
+    assert output["cpu_bruto_sistema_total_s"] == .5
+    assert any("fontes não reconciliadas" in warning for warning in warnings)
+    assert any("menor que tempo da árvore" in warning for warning in warnings)
+    rows[0]["cpu_uma_cpu_pct"] = 10
+    warnings.clear()
+    analysis.verificar_cpu_bruto(path, rows, analysis.instante("2026-10-08T16:00:02Z"),
+                                 analysis.instante("2026-10-08T16:00:04Z"), 0, 2, output, warnings)
+    assert any("inconsistente com os deltas" in warning for warning in warnings)

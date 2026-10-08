@@ -6,6 +6,9 @@ from collections import Counter
 from datetime import datetime, timezone
 import json
 from pathlib import Path
+import time
+
+from scripts.carga.latencias import RegistroLatencias
 
 from locust import HttpUser, events, task
 
@@ -33,6 +36,8 @@ def argumentos(parser, **kwargs):
     parser.add_argument("--conexoes", choices=("reutilizar", "fechar"), default="reutilizar")
     parser.add_argument("--registrar-worker-pid", action="store_true")
     parser.add_argument("--diagnostico-saida", help="JSON de marcos/contagem; executor define por fase.")
+    parser.add_argument("--latencias-saida", help="CSV exclusivo da medição; sem rampa ou drenagem.")
+    parser.add_argument("--limite-latencias", type=inteiro_positivo, default=100000)
 
 
 @events.init.add_listener
@@ -44,6 +49,8 @@ def instrumentar(environment, **kwargs):
     environment.worker_counts = Counter()
     environment.instrumentacao = {"conexoes": getattr(options, "conexoes", "reutilizar"),
                                   "registrar_worker_pid": getattr(options, "registrar_worker_pid", False)}
+    latency_path = getattr(options, "latencias_saida", None)
+    recorder = RegistroLatencias(latency_path, getattr(options, "limite_latencias", 100000)) if latency_path else None
 
     def save():
         if path:
@@ -62,12 +69,19 @@ def instrumentar(environment, **kwargs):
         # Listener registrado em init, após o listener de reset do runner local.
         environment.worker_counts.clear()
         mark("usuarios_prontos_utc")
+        if recorder:
+            recorder.ativo = True
 
     def stopping(**kw):
+        if recorder:
+            recorder.ativo = False
         environment.instrumentacao["pids_janela"] = dict(environment.worker_counts)
         mark("encerramento_inicio_utc")
 
     def stopped(**kw):
+        if recorder:
+            recorder.fechar()
+            environment.instrumentacao["latencias"] = recorder.metadados()
         environment.instrumentacao["pids_apos_encerramento"] = dict(environment.worker_counts)
         mark("fase_fim_utc")
 
@@ -75,6 +89,12 @@ def instrumentar(environment, **kwargs):
     environment.events.spawning_complete.add_listener(ready)
     environment.events.test_stopping.add_listener(stopping)
     environment.events.test_stop.add_listener(stopped)
+    if recorder:
+        def request(name, response_time, exception=None, response=None, **kw):
+            if name == "/primos":
+                pid = response.headers.get("X-Worker-PID", "") if response is not None else ""
+                recorder.registrar(time.time(), response_time, exception is not None, pid)
+        environment.events.request.add_listener(request)
 
 
 def registrar_pid(environment, response):

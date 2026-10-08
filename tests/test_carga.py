@@ -39,6 +39,8 @@ def test_preparar_sem_http_e_sem_sobrescrever(tmp_path, monkeypatch):
     assert not data["provisionamento_verificado_automaticamente"]
     assert [item["fase"] for item in data["fases"]] == ["aquecimento", "medicao"]
     assert all(item["estado"] == "planejado" for item in data["fases"])
+    assert "--latencias-saida" not in data["fases"][0]["comando"]
+    assert "--latencias-saida" in data["fases"][1]["comando"]
     assert list(directory.iterdir()) == [directory / "parametros.json"]
     with pytest.raises(FileExistsError):
         carga.main(args)
@@ -133,19 +135,32 @@ from pathlib import Path
 from locust.event import Events
 with tempfile.TemporaryDirectory() as directory:
     env = SimpleNamespace(events=Events(), parsed_options=SimpleNamespace(
-        diagnostico_saida=str(Path(directory)/"marcos.json"), conexoes="fechar", registrar_worker_pid=True))
+        diagnostico_saida=str(Path(directory)/"marcos.json"), conexoes="fechar", registrar_worker_pid=True,
+        latencias_saida=str(Path(directory)/"latencias.csv"), limite_latencias=10))
     module["instrumentar"](env)
     env.events.test_start.fire()
+    env.events.request.fire(name="/primos", response_time=99, exception=None)
     env.worker_counts["rampa"] = 1
     env.events.spawning_complete.fire(user_count=2)
     assert not env.worker_counts
+    env.events.request.fire(name="/health", response_time=99, exception=None)
+    env.events.request.fire(name="/primos", response_time=10, exception=None)
+    env.events.request.fire(name="/primos", response_time=30, exception=ValueError("falha"))
     env.worker_counts["1165/HTTP_200"] = 3
     env.events.test_stopping.fire()
+    env.events.request.fire(name="/primos", response_time=99, exception=None)
     env.worker_counts["1165/HTTP_200"] += 1
     env.events.test_stop.fire()
     data = json.loads(Path(directory,"marcos.json").read_text())
     assert data["pids_janela"]["1165/HTTP_200"] == 3
     assert data["pids_apos_encerramento"]["1165/HTTP_200"] == 4
+    assert data["latencias"]["completo"]
+    assert data["latencias"]["registros"] == 2
+    import csv
+    with Path(directory,"latencias.csv").open(newline="") as source:
+        rows = list(csv.DictReader(source))
+    assert [float(row["latencia_ms"]) for row in rows] == [10,30]
+    assert [row["falha"] for row in rows] == ["0","1"]
     assert all(data[field].endswith("+00:00") for field in (
         "fase_inicio_utc", "usuarios_prontos_utc", "encerramento_inicio_utc", "fase_fim_utc"))
 '''
@@ -196,3 +211,11 @@ def test_relogio_de_outro_alvo_rejeitado(tmp_path, monkeypatch):
     with pytest.raises(SystemExit):
         carga.main(["--cenario", "C4", "--usuarios", "2", "--verificacao-relogio", str(clock_file)])
     assert not (tmp_path / "experimentos").exists()
+
+
+@pytest.mark.parametrize("value", ["0", "1000001"])
+def test_limite_latencias_executor(value, tmp_path, monkeypatch):
+    monkeypatch.setattr(carga, "ROOT", tmp_path)
+    with pytest.raises(SystemExit):
+        carga.main(["--cenario", "C1", "--usuarios", "1", "--limite-latencias", value, "--somente-preparar"])
+    assert not list(tmp_path.iterdir())

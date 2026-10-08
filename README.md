@@ -871,7 +871,7 @@ da janela interrompem a consolidação. Se falta `parametros.json` ou a fase de
 medição com horários, não é possível atribuir uma janela confiável e a análise
 é interrompida. Uma fase com erro ou incompleta é identificada nos avisos.
 
-Para excluir rampa e encerramento, informe o offset **real** do relógio local
+Para coletas anteriores sem marcos diretos, informe o offset **real** do relógio local
 usado no console Windows: `--offset-log-minutos -180` significa UTC-3. Isso
 converte timestamps do console; não corrige o relógio da VM. Os marcadores de
 reset e início do encerramento delimitam candidatos. A janela efetiva vai do
@@ -887,7 +887,9 @@ selecionados estritamente dentro desses limites e com a demanda correta.
 Sem offset/marcadores nem limites explícitos, o resumo acumulado continua
 disponível, mas a janela e suas métricas ficam ausentes: não presume que
 início do subprocesso seja início da carga nem usa duração nominal para
-inventar o instante exato de encerramento.
+inventar o instante exato de encerramento. Coletas com marcos UTC diretos não
+dependem do offset do console; as novas latências individuais permitem a janela
+completa entre esses marcos, conforme o procedimento para coleta definitiva.
 
 As amostras Linux passam pelo filtro UTC da janela. Para evitar CPU parcialmente
 fora da carga, o intervalo inteiro anterior à amostra também precisa caber
@@ -904,10 +906,10 @@ de compartilhamento; USS/PSS ausentes continuam ausentes.
 |---|---|
 | `latencia_media_snapshot_ms`, `p95_snapshot_ms`, `vazao_snapshot_rps` | Valores exportados em `medicao_stats.csv`, em ms e requisições/s; são acumulados do último CSV disponível, não necessariamente valores finais nem exclusivos da janela recortada. |
 | `req_snapshot`, `falhas_snapshot` | Contadores exportados nesse mesmo snapshot. O escritor periódico pode não ter salvo a última requisição; não corrige usando valores inventados. |
-| `req_janela`, `falhas_janela`, `sucessos_janela` | Diferença dos contadores do primeiro/último snapshot da janela; sucessos = requisições registradas menos falhas. O intervalo corresponde a completamentos observados, não necessariamente a requisições iniciadas dentro dele. |
-| `vazao_calculada_janela_rps` | `delta(Total Request Count) / delta(Timestamp)`, incluindo falhas. Não é igual à quantidade de usuários concorrentes. |
-| `latencia_media_calculada_janela_ms` | Opcional, com `--latencias-completas`: `(media_final × contagem_final − media_inicial × contagem_inicial) / delta_contagem`. Só declare se todas as requisições registradas possuem tempo de resposta; os CSV não exportam a contagem de latências ausentes. Sem essa declaração, fica vazia. |
-| `p95_janela_ms` | Indisponível: o CSV não contém distribuição completa por janela nem latências individuais. Percentis móveis do histórico não podem ser promediados para obter o p95 global. |
+| `req_janela`, `falhas_janela`, `sucessos_janela` | Com registro individual completo, conta eventos na janela `(início, fim]`; sucessos = total menos falhas. Nas coletas anteriores, usa diferenças dos contadores do histórico. Conta conclusões, incluindo requisições iniciadas antes da borda inicial. |
+| `vazao_calculada_janela_rps` | Requisições concluídas, incluindo falhas, divididas pela duração real da respectiva janela. Não é igual à quantidade de usuários concorrentes. |
+| `latencia_media_calculada_janela_ms` | Com eventos completos: média aritmética das latências em ms. Em dados anteriores, opcionalmente com `--latencias-completas`, reconstrói `(media_final × contagem_final − media_inicial × contagem_inicial) / delta_contagem`; só declare se todas as requisições têm duração disponível. |
+| `p95_janela_ms` | Com eventos completos: latência ordenada no posto `ceil(0.95*n)` (percentil empírico, sem interpolação). Ausente em dados anteriores. Percentis móveis não podem ser combinados para recuperar p95 da janela. |
 | `cpu_vm_pct_*`, `cpu_arvore_capacidade_pct_*` | Percentuais da capacidade total da VM; `*_media`, `*_max`, `*_n` identificam estatística e quantidade de valores. |
 | `cpu_arvore_uma_cpu_pct_*` | Escala de uma CPU lógica: pode chegar a aproximadamente 200% em duas vCPUs. |
 | `ram_*_bytes_*`, `rss_soma_bytes_*`, `uss_soma_bytes_*`, `pss_soma_bytes_*` | Valores em bytes. Para MiB, divida por 1048576; não confunda memória usada psutil com total menos disponível. |
@@ -916,13 +918,16 @@ O resumo registra parâmetros, versões disponíveis e recursos planejados/obser
 Valores `snapshot` são extraídos dos CSV; diferenças de contagem, vazão,
 reconstrução de média e estatísticas de recursos são calculados. Não trate os
 escopos como idênticos nem compare p95 acumulado com CPU de outra janela sem
-explicitar essa limitação. Para futuros p95 exclusivos de uma janela, será
-necessária uma coleta com distribuição ou tempos individuais adequados.
+explicitar essa limitação. A nova coleta individual permite calcular média e p95
+na mesma janela UTC usada para filtrar recursos; consulte o procedimento abaixo.
 
 **Relógios:** confirme externamente a sincronização Windows/Ubuntu. Somente então
 use `--relogios-sincronizados`; o argumento registra a confirmação, não executa
 uma verificação NTP. Se mediu uma diferença constante, `--correcao-monitor-s`
-soma esse valor ao horário Linux (por exemplo, VM atrasada 2 s: valor `2`).
+soma esse valor ao horário Linux (por exemplo, VM atrasada 2 s: valor `2`),
+com precedência sobre a sondagem. Sem override, usa automaticamente a
+verificação de relógio incorporada em `parametros.json`, se válida e da mesma URL.
+O offset é `Linux − Windows`; portanto, `UTC alinhado = UTC Linux − offset`.
 Não ajuste pelo pico de CPU. O script detecta possível salto do relógio através
 de UTC versus monotônico nos metadados Windows e nas amostras Linux (aviso
 quando a diferença/variação excede 1 s). Ausência de sobreposição também gera
@@ -1059,7 +1064,8 @@ relógios e iniciar o monitor na VM; **não foi executado nesta preparação**:
 Use `--somente-preparar` para registrar o plano sem enviar requisições. Não
 inicie uma repetição preparada na mesma pasta: escolha um novo número. Para
 o modo padrão, omita `--conexoes` ou informe `reutilizar`. A verificação de
-relógio é anexada aos metadados para auditoria, sem aplicar correção automática.
+relógio é anexada aos metadados para auditoria; o executor preserva horários
+originais e o consolidador aplica a correção estimada durante a análise.
 Confira URL, idade e condições das sondagens antes de usá-las.
 
 Cada fase gera `aquecimento_instrumentacao.json` ou `medicao_instrumentacao.json`
@@ -1080,12 +1086,105 @@ contadores são de respostas HTTP, e falhas de conteúdo continuam no Locust.
 Requisições que atravessam uma fronteira temporal são contabilizadas ao completar.
 Essa instrumentação foi preparada para Locust local, sem distribuição master/worker.
 
-Novos testes usam mocks e respostas locais pequenas, sem carga contra a VM.
-Nesta etapa, 159 testes passaram, com apenas o aviso conhecido do Starlette;
-`pip check` não encontrou incompatibilidades. A comparação por AST confirmou
-que `contar_primos`, `primos` e `health` mantêm seus corpos anteriores.
-Continuam pendentes a verificação experimental dos relógios, a associação real
-das conexões aos workers e a reconciliação dos contadores de CPU no VirtualBox.
+Os testes usam mocks e respostas locais pequenas, sem carga contra a VM.
+A instrumentação mantém a lógica matemática da aplicação. A causa da
+incompatibilidade entre CPU global e tempos dos processos no VirtualBox
+continua pendente de investigação; a ferramenta mantém as fontes separadas.
+
+## Procedimento para a coleta definitiva
+
+Use os mesmos scripts, versões e opções de diagnóstico em C1–C4. Mantenha
+`limite=250000`, `espera=0` e `conexoes=fechar` em todas as repetições comparáveis.
+O modelo é fechado: cada usuário espera a resposta antes de iniciar outra
+requisição; `--taxa` controla a rampa de usuários, não a taxa de requisições.
+Fechar conexões acrescenta esse custo à latência e não garante balanceamento.
+Escolha demandas e durações após a calibração; os números abaixo são um exemplo
+de procedimento, não um experimento executado automaticamente.
+
+Na VM, confirme CPU/RAM realmente provisionadas e workers. Para C4, em um
+terminal dedicado na raiz do projeto:
+
+```bash
+source .venv/bin/activate
+CPU_DIAGNOSTICO=1 python -m uvicorn apps.cpu_bound.main:app --host 0.0.0.0 --port 8001 --workers 2 &
+servidor_pid=$!
+python scripts/monitoramento/monitorar_linux.py --pid "$servidor_pid" --cenario C4 --usuarios 2 --repeticao 100 --intervalo 1 --duracao 240 --diagnostico-cpu --resultados experimentos/resultados/carga --condicoes 'C4; 2 vCPUs; 2 GiB RAM; 2 workers; limite=250000; espera=0; conexoes=fechar'
+```
+
+C1/C2 utilizam um worker; C3/C4, dois. Não reutilize diretórios de repetições
+existentes. Inicie a coleta antes do aquecimento e confira que ela cobre toda a
+medição, considerando sondagens, inicialização e drenagem (até 35 s por fase).
+Se a preparação demorar, reveja a duração de monitoramento antes da carga.
+Não remova o monitoramento anterior para repetir uma coleta.
+
+No Windows, na raiz do projeto, com dependências opcionais já instaladas em
+`.venv` (`requirements-carga.txt`; na VM, `requirements-monitoramento.txt`):
+
+```powershell
+$env:TEMP='D:\atividade-2-poi\.temp'
+$env:TMP=$env:TEMP
+New-Item -ItemType Directory -Force $env:TEMP | Out-Null
+.\.venv\Scripts\python.exe scripts/monitoramento/verificar_relogios.py --url http://127.0.0.1:8001 --amostras 5 --saida .temp/relogio_C4_r100_antes.json
+.\.venv\Scripts\python.exe scripts/carga/executar_locust.py --url http://127.0.0.1:8001 --cenario C4 --usuarios 2 --taxa 2 --aquecimento 30 --duracao 60 --limite 250000 --espera 0 --conexoes fechar --registrar-worker-pid --verificacao-relogio .temp/relogio_C4_r100_antes.json --limite-latencias 100000 --repeticao 100
+.\.venv\Scripts\python.exe scripts/monitoramento/verificar_relogios.py --url http://127.0.0.1:8001 --amostras 5 --saida .temp/relogio_C4_r100_depois.json
+```
+
+Esses comandos enviam requisições: execute-os apenas quando iniciar o
+experimento autorizado. Para preparar um plano sem HTTP, use somente o comando
+do executor com `--somente-preparar`, sem executar sondagens; ele reserva uma
+pasta, portanto use outro número para a futura execução. TEMP/TMP valem apenas
+para a sessão atual. Preserve também a sondagem posterior junto da documentação
+da execução, em arquivo novo; ela não é incorporada automaticamente. Compare
+offsets e suas faixas de incerteza antes/depois: deriva, ajustes de relógio ou
+faixas incompatíveis exigem revisão do alinhamento, não uma correção silenciosa.
+
+O executor cria `medicao_latencias.csv`, com `concluida_utc`, `latencia_ms`,
+`falha` e `worker_pid`. O registro inicia após a rampa/reset e termina antes da
+drenagem. Aquecimento ocorre em outro processo e não gera esse CSV. São escritas
+linhas pequenas com buffer, sem manter latências em RAM durante a carga ou fazer
+`fsync` por requisição. Há custo de instrumentação no Windows: use a mesma
+política em todos os cenários. O limite padrão é 100000 registros; o máximo
+configurável é 1000000. O JSON da fase registra contagem, descartes, erros e
+completude. Truncamento, duração ausente ou arquivo incompleto impedem publicar
+média/p95 individuais como completos. Falhas com duração válida entram nessas
+estatísticas; falhas sem duração invalidam a completude.
+
+Copie os arquivos de monitoramento da VM para a pasta da mesma repetição no
+Windows, sem substituir arquivos preexistentes. Para consolidar em pasta nova:
+
+```powershell
+.\.venv\Scripts\python.exe scripts/analise/consolidar_resultados.py experimentos/resultados/carga/C4/usuarios_02/repeticao_100 --saida experimentos/resultados/analise/definitivos_C4_r100
+```
+
+A análise preserva todos os originais. Para eventos completos usa os marcos UTC
+diretos, ou `--inicio-utc`/`--fim-utc` dentro desses marcos; para dados antigos
+mantém o recorte por snapshots. Continua exigindo histórico suficiente para
+verificar demanda estável. `*_snapshot` permanece acumulado; nas novas coletas,
+`req_hist_janela`, `falhas_hist_janela`, `inicio_hist_janela_utc`,
+`fim_hist_janela_utc`, `duracao_hist_janela_s`, `vazao_hist_calculada_janela_rps`
+e `latencia_media_hist_calculada_ms` identificam o recorte histórico separado.
+Não compare percentis Locust arredondados com percentis empíricos como se
+usassem o mesmo método. Sem eventos individuais, p95 da janela fica ausente.
+
+O consolidado registra modo de conexão, usuários, limite, espera, rampa,
+durações e marcos de fases, recursos/worker planejados e recursos Linux
+observados. Provisionamento planejado não comprova configuração efetiva.
+Registra também correção, origem, offset, incerteza e idade da sondagem.
+Por exemplo, offset `-3.9826785 s` resulta em somar `+3.9826785 s` ao UTC Linux.
+A incerteza de comunicação não cobre deriva posterior nem prova sincronização;
+amostras próximas das bordas devem ser interpretadas com essa tolerância.
+
+Com `cpu_bruto.jsonl`, confere `100*delta(user+system)/delta(monotônico)` contra
+CPU/intervalo dos processos no CSV e sua normalização por CPUs lógicas. Registra
+contagem conferida, segundos de CPU acumulados e erro máximo em pontos
+percentuais. Não inclui tempos dos filhos. Para o sistema registra deltas de
+ticks em segundos e intervalos monotônicos, separadamente. Leituras são
+sequenciais e não atômicas. Avisos são emitidos para diferenças acima de 5% na
+capacidade bruta esperada, tempo ocupado global menor que o da árvore ou média
+global mais de 5 pontos abaixo da árvore. Esses limiares são diagnósticos, não
+uma correção nem prova de causa. A CPU global permanece a métrica original
+psutil; não é substituída pela CPU dos processos. CSV antigos e contadores
+ausentes continuam aceitos, com avisos e campos indisponíveis.
 
 ## Versionamento e publicação
 
@@ -1139,11 +1238,13 @@ tests/test_carga.py
 tests/test_monitoramento.py
 tests/test_analise.py
 tests/test_relogios.py
+tests/test_latencias.py
 scripts/
   analise/consolidar_resultados.py
   carga/.gitkeep
   carga/locustfile.py
   carga/executar_locust.py
+  carga/latencias.py
   monitoramento/.gitkeep
   monitoramento/verificar_memoria_windows.py
   monitoramento/verificar_io_windows.py

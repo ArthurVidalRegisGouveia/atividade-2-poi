@@ -49,10 +49,14 @@ def parser():
     result.add_argument("--conexoes", choices=("reutilizar", "fechar"), default="reutilizar")
     result.add_argument("--registrar-worker-pid", action="store_true")
     result.add_argument("--verificacao-relogio", help="JSON de sondagens realizado antes da carga.")
+    result.add_argument("--limite-latencias", type=positivo, default=100000,
+                        help="Máximo de respostas registradas na medição (até 1000000).")
     return result
 
 
 def validar(options, argument_parser):
+    if options.limite_latencias > 1000000:
+        argument_parser.error("Limite de latências não pode exceder 1000000.")
     url = urlsplit(options.url)
     if (url.scheme not in ("http", "https") or not url.hostname
             or url.username or url.password or url.query or url.fragment
@@ -78,6 +82,9 @@ def comando(options, phase, directory):
     ]
     if options.registrar_worker_pid:
         command.append("--registrar-worker-pid")
+    if phase == "medicao":
+        command.extend(["--latencias-saida", str(directory / "medicao_latencias.csv"),
+                        "--limite-latencias", str(options.limite_latencias)])
     return command
 
 
