@@ -1,6 +1,7 @@
 """Executa apenas um cenário/repetição; não altera o provisionamento da VM."""
 
 import argparse
+import csv
 from datetime import datetime, timezone
 from importlib.metadata import version
 import json
@@ -125,6 +126,48 @@ def agora():
     return datetime.now(timezone.utc).isoformat()
 
 
+def validar_fase(directory, phase, users, diagnostic):
+    """Código zero não comprova carga válida nem encerramento sem erros."""
+    errors = []
+    if not isinstance(diagnostic, dict):
+        diagnostic = {}
+    console = (directory / f"{phase}_console.txt").read_text(encoding="utf-8", errors="replace")
+    for marker in ("Traceback (most recent call last)", "Unhandled exception in greenlet",
+                   "I/O operation on closed file", "unexpected state: stopping"):
+        if marker.lower() in console.lower():
+            errors.append(f"Erro no console: {marker}")
+    try:
+        with (directory / f"{phase}_stats.csv").open(encoding="utf-8-sig", newline="") as source:
+            totals = [r for r in csv.DictReader(source) if r.get("Name") == "Aggregated"]
+        count = float(totals[0]["Request Count"]) if len(totals) == 1 else 0
+        if not math.isfinite(count) or count <= 0:
+            errors.append("Fase sem requisições concluídas no resumo Locust.")
+        with (directory / f"{phase}_stats_history.csv").open(encoding="utf-8-sig", newline="") as source:
+            history = [r for r in csv.DictReader(source) if r.get("Name") == "Aggregated"]
+        start = datetime.fromisoformat(diagnostic["usuarios_prontos_utc"])
+        end = datetime.fromisoformat(diagnostic["encerramento_inicio_utc"])
+        if start.tzinfo is None or end.tzinfo is None or start >= end:
+            raise ValueError("Marcos UTC inválidos")
+        inside = [r for r in history if start.timestamp() < float(r["Timestamp"]) < end.timestamp()]
+        if len({r["Timestamp"] for r in inside if float(r["User Count"]) == users}) < 2:
+            errors.append("Sem dois snapshots de carga com a quantidade solicitada de usuários.")
+        if any(float(r["User Count"]) != users for r in inside):
+            errors.append("Quantidade de usuários divergiu do plano durante a janela.")
+        if any(e.get("usuarios") != users for e in diagnostic.get("eventos_usuarios", [])):
+            errors.append("Alteração inesperada da quantidade de usuários registrada na instrumentação.")
+        if phase == "medicao":
+            latency = diagnostic.get("latencias", {})
+            if not latency.get("completo") or not latency.get("registros", 0):
+                errors.append("Registro de latências ausente, incompleto ou vazio.")
+            with (directory / "medicao_latencias.csv").open(encoding="utf-8-sig", newline="") as source:
+                records = list(csv.DictReader(source))
+            if len(records) != latency.get("registros"):
+                errors.append("Contagem de latências diverge do arquivo registrado.")
+    except (OSError, ValueError, TypeError, KeyError, AttributeError) as error:
+        errors.append(f"Artefatos de validação ausentes/inválidos: {error}")
+    return errors
+
+
 def main(argv=None):
     argument_parser = parser()
     options = argument_parser.parse_args(argv)
@@ -151,6 +194,7 @@ def main(argv=None):
         "timeout_http_s": 30, "stop_timeout_s": 35,
         "duracoes_incluem_rampa": True,
         "aquecimento_em_processo_separado": True,
+        "entrada_interativa": "desabilitada (stdin pipe fechado; NUL pode ser tty no Windows)",
         "criado_utc": agora(), "fases": [],
         "verificacao_relogio": clock_check,
     }
@@ -177,13 +221,16 @@ def main(argv=None):
         try:
             with (directory / f"{phase}_console.txt").open("x", encoding="utf-8") as output:
                 completed = subprocess.run(command, cwd=ROOT, stdout=output,
-                                           stderr=subprocess.STDOUT, check=False)
-            entry.update(estado="concluido", codigo_saida=completed.returncode)
+                                           stderr=subprocess.STDOUT, stdin=subprocess.PIPE, check=False)
+            entry.update(codigo_saida=completed.returncode)
             diagnostic = directory / f"{phase}_instrumentacao.json"
-            if diagnostic.is_file():
+            try:
                 entry["instrumentacao"] = json.loads(diagnostic.read_text(encoding="utf-8"))
-            else:
-                entry["aviso_instrumentacao"] = "Marcos diretos ausentes; compatibilidade com console mantida."
+            except (OSError, ValueError):
+                entry["instrumentacao"] = {}
+            issues = validar_fase(directory, phase, options.usuarios, entry["instrumentacao"])
+            entry.update(estado="falha" if completed.returncode or issues else "concluido",
+                         erros_validacao=issues)
         except (OSError, KeyboardInterrupt) as error:
             entry.update(estado="interrompido", erro=type(error).__name__)
             raise
@@ -192,6 +239,9 @@ def main(argv=None):
             salvar()
         if completed.returncode:
             return completed.returncode
+        if issues:
+            print(f"Fase {phase} inválida: {'; '.join(issues)}", file=sys.stderr)
+            return 2
     print(f"Resultados: {directory.relative_to(ROOT)}")
     return 0
 

@@ -176,9 +176,12 @@ class Operacoes:
         with logfile.open("x", encoding="utf-8") as output:
             env = dict(os.environ, TEMP=str(self.root / ".temp"), TMP=str(self.root / ".temp"))
             process = subprocess.Popen(command, cwd=self.root, stdout=output, stderr=subprocess.STDOUT,
+                                       stdin=subprocess.PIPE,
                                        env=env,
                                        creationflags=subprocess.CREATE_NEW_PROCESS_GROUP if os.name == "nt" else 0,
                                        start_new_session=os.name != "nt")
+            # NUL/DEVNULL pode ser tty no Windows; pipe fechado desativa os atalhos.
+            process.stdin.close()
             import psutil
             try:
                 process.poi_identity = psutil.Process(process.pid).create_time()

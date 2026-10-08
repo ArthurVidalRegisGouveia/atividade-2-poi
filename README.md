@@ -1562,6 +1562,53 @@ deve ocorrer somente após autorização e definição da URL da organização.
 
 ## Execução futura no Ubuntu Server
 
+### Estatística dos experimentos definitivos C4
+
+No Windows, instale a dependência de gráficos somente no ambiente virtual:
+
+```powershell
+$env:TEMP = 'D:\atividade-2-poi\.temp'
+$env:TMP = $env:TEMP
+.\.venv\Scripts\python.exe -m pip install --no-cache-dir -r requirements-analise.txt
+$env:MPLCONFIGDIR = 'D:\atividade-2-poi\.temp\matplotlib'
+.\.venv\Scripts\python.exe scripts/analise/analisar_definitivos.py
+```
+
+A ferramenta lê somente o índice de `definitivos_C4_01` e os consolidados
+referenciados nos manifestos concluídos. Exige três repetições lógicas distintas
+por combinação, exclui R2002 com falha e seleciona R2012 como repetição lógica 2.
+Valida identidade e janela útil, recusa duplicatas e não incorpora validações R1001.
+Não regrava fontes nem recalcula sua correção de relógios.
+
+A saída padrão é `experimentos/resultados/analise_final/C4/`, com CSV individual,
+estatísticas por métrica (média, DP amostral, mínimo, máximo, n válido), avisos,
+auditoria SHA-256, relatório Markdown e cinco gráficos em PNG/SVG. CPU global é
+diagnóstica e separada da CPU da árvore. P95 agregado significa média entre p95
+das três execuções. USS/PSS ausentes não viram zero. Para disco, `--dispositivo sda`
+seleciona um único dispositivo; não soma o disco com suas partições.
+
+O script recusa saída preexistente. Para gerar outra versão sem substituir a
+anterior, informe uma pasta nova, por exemplo
+`--saida experimentos/resultados/analise_final/C4_revisao_02`. Consulte o relatório gerado
+para as hipóteses de gargalos, limitações de RSS, relógios e contadores de disco da VM.
+
+Para a recuperação isolada da falha C4/R2002, consulte
+[diagnóstico e procedimento de recuperação](docs/diagnostico_r2002.md).
+O executor automatizado fecha a entrada por pipe para desabilitar os atalhos do
+Locust, inclusive no Windows. Cada fase exige requisições, histórico com usuários
+planejados e marcos válidos; erros de encerramento no console invalidam a fase
+mesmo com código de saída zero. A medição também exige latências completas e não
+vazias. Aquecimento inválido impede iniciar a medição.
+
+No consolidado, `amostras_sistema` conta somente intervalos selecionados para
+uma janela válida de carga. `amostras_sistema_disponiveis` conta linhas lidas e
+`amostras_sistema_intervalo_nominal` conta intervalos inteiramente contidos nos
+marcos temporais, após correção de relógio, mesmo quando a carga é inválida.
+Os campos `inicio_intervalo_nominal_utc`, `fim_intervalo_nominal_utc` e
+`janela_carga_valida` esclarecem essa distinção. A contagem nominal é diagnóstica;
+não habilita médias de recursos de um experimento sem carga válida. Dados antigos
+continuam aceitos pelo consolidador; originais não são regravados.
+
 Crie um novo `.venv` dentro da VM; ambientes virtuais do Windows não são portáveis
 para Linux. Se `venv` ou pip estiverem ausentes, será necessário instalar os
 pacotes do sistema correspondentes (`python3-venv` e `python3-pip`) com autorização

@@ -1,6 +1,8 @@
 """Validação do planejamento sem requisições à VM nem carga de estresse."""
 
 import json
+import csv
+from datetime import datetime, timedelta, timezone
 from importlib.util import find_spec
 from pathlib import Path
 import subprocess
@@ -9,6 +11,29 @@ import sys
 import pytest
 
 from scripts.carga import executar_locust as carga
+
+
+
+def artefatos_validos(command):
+    prefix = Path(command[command.index("--csv") + 1])
+    users = int(command[command.index("--users") + 1])
+    start = datetime.now(timezone.utc)
+    end = start + timedelta(seconds=10)
+    def write(path, rows):
+        with path.open("w", encoding="utf-8", newline="") as f:
+            writer = csv.DictWriter(f, fieldnames=list(rows[0]))
+            writer.writeheader(); writer.writerows(rows)
+    write(Path(str(prefix) + "_stats.csv"), [{"Name": "Aggregated", "Request Count": 2}])
+    write(Path(str(prefix) + "_stats_history.csv"), [
+        {"Name": "Aggregated", "Timestamp": (start + timedelta(seconds=t)).timestamp(),
+         "User Count": users} for t in (2, 5)])
+    data = {"usuarios_prontos_utc": start.isoformat(), "encerramento_inicio_utc": end.isoformat(),
+            "eventos_usuarios": [{"usuarios": users}]}
+    if "--latencias-saida" in command:
+        write(Path(command[command.index("--latencias-saida") + 1]), [{"latencia_ms": 10}])
+        data["latencias"] = {"registros": 1, "completo": True}
+    Path(command[command.index("--diagnostico-saida") + 1]).write_text(json.dumps(data), encoding="utf-8")
+    return data
 
 
 @pytest.mark.parametrize("argument,value", [
@@ -54,6 +79,8 @@ def test_fases_e_falha_no_aquecimento(tmp_path, monkeypatch, returncode, expecte
 
     def fake_run(command, **kwargs):
         calls.append(command)
+        assert kwargs["stdin"] == subprocess.PIPE
+        artefatos_validos(command)
         return subprocess.CompletedProcess(command, returncode)
 
     monkeypatch.setattr(carga.subprocess, "run", fake_run)
@@ -163,6 +190,24 @@ with tempfile.TemporaryDirectory() as directory:
     assert [row["falha"] for row in rows] == ["0","1"]
     assert all(data[field].endswith("+00:00") for field in (
         "fase_inicio_utc", "usuarios_prontos_utc", "encerramento_inicio_utc", "fase_fim_utc"))
+with tempfile.TemporaryDirectory() as directory:
+    env = SimpleNamespace(events=Events(), parsed_options=SimpleNamespace(
+        num_users=2, diagnostico_saida=str(Path(directory)/"marcos.json"),
+        latencias_saida=str(Path(directory)/"latencias.csv"), limite_latencias=10))
+    module["instrumentar"](env)
+    env.events.test_start.fire()
+    env.events.spawning_complete.fire(user_count=0)
+    assert "usuarios_prontos_utc" not in env.instrumentacao
+    env.events.spawning_complete.fire(user_count=2)
+    original = env.instrumentacao["usuarios_prontos_utc"]
+    env.events.request.fire(name="/primos", response_time=10, exception=None)
+    env.events.spawning_complete.fire(user_count=0)
+    assert env.instrumentacao["usuarios_prontos_utc"] == original
+    env.events.request.fire(name="/primos", response_time=99, exception=None)
+    env.events.test_stopping.fire()
+    env.events.test_stop.fire()
+    assert env.instrumentacao["latencias"]["registros"] == 1
+    assert [e["usuarios"] for e in env.instrumentacao["eventos_usuarios"]] == [0,2,0]
 '''
     root = Path(__file__).resolve().parents[1]
     completed = subprocess.run([sys.executable, "-c", script], cwd=root,
@@ -192,9 +237,7 @@ def test_executor_incorpora_marcos_e_relogio(tmp_path, monkeypatch):
         "offset_estimado_s": -3, "incerteza_meia_faixa_s": .1}}), encoding="utf-8")
 
     def fake_run(command, **kwargs):
-        path = Path(command[command.index("--diagnostico-saida") + 1])
-        path.write_text(json.dumps({"usuarios_prontos_utc": carga.agora(),
-                                   "encerramento_inicio_utc": carga.agora()}), encoding="utf-8")
+        artefatos_validos(command)
         return subprocess.CompletedProcess(command, 0)
 
     monkeypatch.setattr(carga.subprocess, "run", fake_run)
@@ -219,3 +262,69 @@ def test_limite_latencias_executor(value, tmp_path, monkeypatch):
     with pytest.raises(SystemExit):
         carga.main(["--cenario", "C1", "--usuarios", "1", "--limite-latencias", value, "--somente-preparar"])
     assert not list(tmp_path.iterdir())
+
+
+@pytest.mark.parametrize("problem", ["usuarios_zero", "sem_requisicoes", "csv_fechado", "stopping", "ausentes", "latencias_vazias"])
+def test_codigo_zero_nao_valida_fase(tmp_path, monkeypatch, problem):
+    monkeypatch.setattr(carga, "ROOT", tmp_path)
+    monkeypatch.setattr(carga, "version", lambda _: "teste")
+    calls = []
+    def run(command, **kwargs):
+        calls.append(command)
+        data = artefatos_validos(command)
+        prefix = Path(command[command.index("--csv") + 1])
+        if prefix.name == "medicao":
+            if problem == "usuarios_zero":
+                path = Path(str(prefix) + "_stats_history.csv")
+                rows = list(csv.DictReader(path.open(encoding="utf-8")))
+                for row in rows: row["User Count"] = 0
+                with path.open("w", newline="", encoding="utf-8") as f:
+                    writer = csv.DictWriter(f, fieldnames=list(rows[0])); writer.writeheader(); writer.writerows(rows)
+            elif problem == "sem_requisicoes":
+                Path(str(prefix) + "_stats.csv").write_text("Name,Request Count\nAggregated,0\n")
+            elif problem in ("csv_fechado", "stopping"):
+                kwargs["stdout"].write("ValueError: I/O operation on closed file" if problem == "csv_fechado"
+                                       else "Tried to stop User in an unexpected state: stopping")
+            elif problem == "ausentes":
+                Path(command[command.index("--diagnostico-saida") + 1]).write_text("{}")
+            else:
+                data["latencias"]["registros"] = 0
+                Path(command[command.index("--diagnostico-saida") + 1]).write_text(json.dumps(data))
+        return subprocess.CompletedProcess(command, 0)
+    monkeypatch.setattr(carga.subprocess, "run", run)
+    assert carga.main(["--cenario", "C4", "--usuarios", "2"]) == 2
+    path = tmp_path / "experimentos/resultados/carga/cpu/C4/usuarios_02/repeticao_01/parametros.json"
+    phase = json.loads(path.read_text(encoding="utf-8"))["fases"][-1]
+    assert len(calls) == 2 and phase["estado"] == "falha"
+    assert phase["codigo_saida"] == 0 and phase["erros_validacao"]
+
+
+@pytest.mark.skipif(find_spec("locust") is None, reason="Locust não instalado")
+def test_locust_sem_terminal_desabilita_atalhos():
+    # Exercita a biblioteca instalada sem usuários HTTP nem servidor.
+    script = '''
+import sys
+from locust.input_events import input_listener
+called = []
+assert not sys.stdin.isatty()
+input_listener({"S": lambda: called.append("reduzir usuarios")})()
+assert not called
+'''
+    result = subprocess.run([sys.executable, "-c", script], stdin=subprocess.PIPE,
+                            capture_output=True, text=True, timeout=30)
+    assert result.returncode == 0, result.stderr
+
+
+def test_falha_semantica_aquecimento_impede_medicao(tmp_path, monkeypatch):
+    monkeypatch.setattr(carga, "ROOT", tmp_path)
+    monkeypatch.setattr(carga, "version", lambda _: "teste")
+    calls = []
+    def run(command, **kwargs):
+        calls.append(command)
+        artefatos_validos(command)
+        kwargs["stdout"].write("Tried to stop User in an unexpected state: stopping")
+        return subprocess.CompletedProcess(command, 0)
+    monkeypatch.setattr(carga.subprocess, "run", run)
+    assert carga.main(["--cenario", "C4", "--usuarios", "2"]) == 2
+    assert len(calls) == 1
+    assert calls[0][calls[0].index("--csv") + 1].endswith("aquecimento")

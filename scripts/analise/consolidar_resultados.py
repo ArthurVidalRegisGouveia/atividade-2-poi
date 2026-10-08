@@ -72,7 +72,7 @@ def limites_console(path, offset):
     return (reset, stop) if reset and stop and reset < stop else None
 
 
-def janela(history, phase, users, directory, options, warnings):
+def janela(history, phase, users, directory, options, warnings, diagnostic=None):
     lower, upper = instante(phase["inicio_utc"]), instante(phase["fim_utc"])
     if bool(options.inicio_utc) != bool(options.fim_utc):
         raise DadosInvalidos("Informe inicio e fim UTC juntos.")
@@ -95,6 +95,9 @@ def janela(history, phase, users, directory, options, warnings):
         start, end = limits
     if not lower <= start < end <= upper:
         raise DadosInvalidos("Janela fora da fase de medição; confira timezone/relógio.")
+    if diagnostic is not None:
+        diagnostic.update(inicio_intervalo_nominal_utc=start.isoformat(),
+                          fim_intervalo_nominal_utc=end.isoformat())
     # CSV temporal fora de ordem não deve unir segmentos separados.
     history = sorted(history, key=lambda row: numero(row.get("Timestamp")) or float("-inf"))
     selected = []
@@ -411,7 +414,8 @@ def consolidar(directory, options):
         "Name", "Timestamp", "User Count", "Total Request Count", "Total Failure Count",
         "Total Average Response Time",
     ], warnings)
-    valid_window = janela(history, phase, users, directory, options, warnings)
+    valid_window = janela(history, phase, users, directory, options, warnings, output)
+    output["janela_carga_valida"] = valid_window is not None
     output.update(inicio_janela_utc=None, fim_janela_utc=None, duracao_janela_s=None,
                   req_janela=None, falhas_janela=None, sucessos_janela=None,
                   vazao_calculada_janela_rps=None, latencia_media_calculada_janela_ms=None,
@@ -451,6 +455,15 @@ def consolidar(directory, options):
     if residuals and max(residuals) - min(residuals) > 1:
         warnings.append("Relógio Linux: possível salto/atraso; variação UTC/monotônico superior a 1 s.")
     shift = correcao_relogio(metadata, options, output, warnings)
+    output["amostras_sistema_disponiveis"] = len(systems)
+    output["amostras_sistema_intervalo_nominal"] = None
+    if output.get("inicio_intervalo_nominal_utc"):
+        nominal = filtrar(systems, instante(output["inicio_intervalo_nominal_utc"]),
+                          instante(output["fim_intervalo_nominal_utc"]), shift, "intervalo_real_s", warnings)
+        output["amostras_sistema_intervalo_nominal"] = len(nominal)
+    if not valid_window:
+        warnings.append("Sem janela válida de carga: médias Linux não calculadas. "
+                        f"{len(systems)} amostras disponíveis; contagem no intervalo nominal é diagnóstica, não mede carga válida.")
     output["sincronizacao_declarada"] = options.relogios_sincronizados
     if not options.relogios_sincronizados:
         warnings.append("Sincronização dos relógios não confirmada: alinhamento UTC é provisório.")

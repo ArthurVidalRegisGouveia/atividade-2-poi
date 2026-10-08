@@ -81,6 +81,32 @@ def test_janela_contadores_latencia_e_recursos(run):
     assert row["registros_processos"] == 3
 
 
+def test_sem_usuarios_distingue_amostras_disponiveis_e_carga(run):
+    path = run / "medicao_stats_history.csv"
+    rows = list(csv.DictReader(path.open(encoding="utf-8")))
+    for row in rows:
+        row["User Count"] = 0
+        row["Total Request Count"] = 0
+    write_csv(path, rows)
+    row = analysis.consolidar(run, options())
+    assert not row["janela_carga_valida"]
+    assert row["amostras_sistema_disponiveis"] == 6
+    assert row["amostras_sistema_intervalo_nominal"] == 5
+    assert row["amostras_sistema"] == 0
+    assert row["cpu_vm_pct_media"] is None
+    assert row["req_janela"] is None
+    assert "Sem janela válida de carga" in row["avisos"]
+
+
+def test_filtro_iso_offset_intervalo_inteiro():
+    rows = [{"utc": "2026-10-08T13:00:03.100000-03:00", "intervalo_real_s": "1"},
+            {"utc": "2026-10-08T16:00:02.100000Z", "intervalo_real_s": "1.1"}]
+    selected = analysis.filtrar(rows, analysis.instante("2026-10-08T16:00:01Z"),
+                               analysis.instante("2026-10-08T16:00:04+00:00"), -.1,
+                               "intervalo_real_s", [])
+    assert selected == rows[:1]
+
+
 def test_console_timezone_e_exclusao_aquecimento(run):
     (run / "medicao_console.txt").write_text(
         "[2026-10-08 13:00:01,000] INFO Resetting stats\n"

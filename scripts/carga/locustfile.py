@@ -52,6 +52,8 @@ def instrumentar(environment, **kwargs):
         raise ValueError("Arquivo de instrumentação já existe.")
     environment.worker_counts = Counter()
     environment.instrumentacao = {"conexoes": getattr(options, "conexoes", "reutilizar"),
+                                  "usuarios_solicitados": getattr(options, "num_users", None),
+                                  "eventos_usuarios": [],
                                   "aplicacao": getattr(options, "aplicacao", "cpu"),
                                   "registrar_worker_pid": getattr(options, "registrar_worker_pid", False)}
     latency_path = getattr(options, "latencias_saida", None)
@@ -72,6 +74,17 @@ def instrumentar(environment, **kwargs):
 
     def ready(**kw):
         # Listener registrado em init, após o listener de reset do runner local.
+        environment.instrumentacao["eventos_usuarios"].append({
+            "utc": datetime.now(timezone.utc).isoformat(), "usuarios": kw.get("user_count")})
+        expected = getattr(options, "num_users", None)
+        if expected is not None and kw.get("user_count") != expected:
+            if recorder:
+                recorder.ativo = False
+            save()
+            return
+        if environment.instrumentacao.get("usuarios_prontos_utc"):
+            save()
+            return
         environment.worker_counts.clear()
         mark("usuarios_prontos_utc")
         if recorder:
