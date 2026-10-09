@@ -328,3 +328,178 @@ def test_falha_semantica_aquecimento_impede_medicao(tmp_path, monkeypatch):
     assert carga.main(["--cenario", "C4", "--usuarios", "2"]) == 2
     assert len(calls) == 1
     assert calls[0][calls[0].index("--csv") + 1].endswith("aquecimento")
+
+
+def aquecimento_dez_usuarios(directory, rows=None):
+    """Reproduz resolução de um segundo do CSV observado na R3002."""
+    start = datetime.fromisoformat("2026-10-09T00:26:03.825410+00:00")
+    end = datetime.fromisoformat("2026-10-09T00:26:33.115135+00:00")
+    base = int(start.timestamp())
+    if rows is None:
+        rows = [{"Name": "Aggregated", "Timestamp": base + t, "User Count": count}
+                for t, count in [(0, 0), *[(t, 10) for t in range(1, 30)], (30, 7), (31, 0)]]
+    (directory / "aquecimento_console.txt").write_text("Shutting down (exit code 0)", encoding="utf-8")
+    (directory / "aquecimento_stats.csv").write_text("Name,Request Count\nAggregated,203\n", encoding="utf-8")
+    with (directory / "aquecimento_stats_history.csv").open("w", encoding="utf-8", newline="") as f:
+        writer = csv.DictWriter(f, fieldnames=["Name", "Timestamp", "User Count"])
+        writer.writeheader(); writer.writerows(rows)
+    return {"usuarios_solicitados": 10, "usuarios_prontos_utc": start.isoformat(),
+            "encerramento_inicio_utc": end.isoformat(),
+            "fase_fim_utc": "2026-10-09T00:26:34.023966+00:00",
+            "eventos_usuarios": [{"utc": "2026-10-09T00:26:03.825397+00:00", "usuarios": 10}]}
+
+
+def test_dez_usuarios_parada_normal_timestamp_truncado(tmp_path):
+    diagnostic = aquecimento_dez_usuarios(tmp_path)
+    # Uma observação efetivamente posterior ao início da parada parece anterior
+    # quando int(now) é interpretado incorretamente como horário exato.
+    stop = datetime.fromisoformat(diagnostic["encerramento_inicio_utc"]).timestamp()
+    actual = stop + .4
+    assert int(actual) < stop < actual
+    audit = {}
+    assert carga.validar_fase(tmp_path, "aquecimento", 10, diagnostic, audit) == []
+    assert audit["snapshots_inteiros_na_janela"] == 29
+    assert audit["snapshots_fronteira"][-1]["usuarios"] == 7
+
+
+@pytest.mark.parametrize("users", [0, 7, 9, 11])
+def test_divergencia_real_interior_mantida(tmp_path, users):
+    diagnostic = aquecimento_dez_usuarios(tmp_path)
+    path = tmp_path / "aquecimento_stats_history.csv"
+    with path.open(encoding="utf-8") as f: rows = list(csv.DictReader(f))
+    rows[10]["User Count"] = users
+    aquecimento_dez_usuarios(tmp_path, rows)
+    assert "Quantidade de usuários divergiu do plano durante a janela." in carga.validar_fase(tmp_path, "aquecimento", 10, diagnostic)
+
+
+def test_divergencia_evento_preciso_na_fronteira_nao_ignorada(tmp_path):
+    diagnostic = aquecimento_dez_usuarios(tmp_path)
+    diagnostic["eventos_usuarios"].append({"utc": "2026-10-09T00:26:33.050000+00:00", "usuarios": 7})
+    assert any("Alteração inesperada" in e for e in carga.validar_fase(tmp_path, "aquecimento", 10, diagnostic))
+
+
+@pytest.mark.parametrize("mode", ["vazio", "um_snapshot", "duplicado", "fora_ordem", "nan", "usuario_ausente", "coluna_ausente", "arquivo_ausente"])
+def test_historico_incompleto_ou_inconsistente(tmp_path, mode):
+    diagnostic = aquecimento_dez_usuarios(tmp_path)
+    path = tmp_path / "aquecimento_stats_history.csv"
+    with path.open(encoding="utf-8") as f: rows = list(csv.DictReader(f))
+    if mode == "vazio": rows = []
+    elif mode == "um_snapshot": rows = rows[1:2]
+    elif mode == "duplicado": rows[10]["Timestamp"] = rows[9]["Timestamp"]
+    elif mode == "fora_ordem": rows[9], rows[10] = rows[10], rows[9]
+    elif mode == "nan": rows[10]["Timestamp"] = "nan"
+    elif mode == "usuario_ausente": rows[10]["User Count"] = ""
+    aquecimento_dez_usuarios(tmp_path, rows)
+    if mode == "coluna_ausente": path.write_text("Name,Timestamp\nAggregated,1791505564\n", encoding="utf-8")
+    if mode == "arquivo_ausente":
+        # Simula ausência sem excluir nenhum arquivo, inclusive os do fixture.
+        return_path = tmp_path / "sem_historico"
+        return_path.mkdir()
+        (return_path / "aquecimento_console.txt").write_text("")
+        (return_path / "aquecimento_stats.csv").write_text("Name,Request Count\nAggregated,203\n")
+    else: return_path = tmp_path
+    assert carga.validar_fase(return_path, "aquecimento", 10, diagnostic)
+
+
+def test_zero_usuarios_em_todo_historico_nao_validado(tmp_path):
+    diagnostic = aquecimento_dez_usuarios(tmp_path)
+    path = tmp_path / "aquecimento_stats_history.csv"
+    with path.open(encoding="utf-8") as f: rows = list(csv.DictReader(f))
+    for row in rows: row["User Count"] = 0
+    aquecimento_dez_usuarios(tmp_path, rows)
+    errors = carga.validar_fase(tmp_path, "aquecimento", 10, diagnostic)
+    assert any("Sem dois snapshots" in e for e in errors)
+    assert any("divergiu" in e for e in errors)
+
+
+def test_historico_fracionario_preserva_precisao(tmp_path):
+    diagnostic = aquecimento_dez_usuarios(tmp_path)
+    stop = datetime.fromisoformat(diagnostic["encerramento_inicio_utc"]).timestamp()
+    rows = [{"Name": "Aggregated", "Timestamp": stop + delta, "User Count": count}
+            for delta, count in [(-10.4,10), (-5.4,10), (-.1,7), (.4,0)]]
+    aquecimento_dez_usuarios(tmp_path, rows)
+    assert any("divergiu" in e for e in carga.validar_fase(tmp_path, "aquecimento", 10, diagnostic))
+
+
+def snapshots_contadores():
+    return [{"Timestamp": stamp, "User Count": 1, "Total Request Count": req,
+             "Total Failure Count": fail}
+            for stamp, req, fail in [(101,3,0), (101,6,0), (102,8,0), (103,10,1)]]
+
+
+def test_timestamp_repetido_progressivo_preserva_todas_linhas_e_ordem():
+    rows = snapshots_contadores()
+    original = [dict(r) for r in rows]
+    audit = {}
+    selected = carga.historico_na_janela(rows, 100.5, 104.5, audit)
+    assert selected == rows == original
+    assert all(a is b for a,b in zip(selected,rows))
+    assert [r["Total Request Count"] for r in selected[:2]] == [3,6]
+    assert audit["snapshots_inteiros_na_janela"] == 4
+    assert audit["snapshots_timestamp_repetido"] == 1
+    assert audit["contadores_acumulados_presentes"]
+
+
+@pytest.mark.parametrize("mode", ["retrocesso", "regressao_req_igual", "regressao_req_distinto", "regressao_falhas",
+                                  "falhas_excedentes", "delta_falhas_excedente", "negativo", "fracionario",
+                                  "nan", "inf", "coluna_ausente", "valor_vazio", "usuarios_negativos", "timestamp_inf"])
+def test_snapshots_repetidos_inconsistentes_rejeitados(mode):
+    rows = snapshots_contadores()
+    if mode == "retrocesso": rows[1]["Timestamp"] = 100
+    elif mode == "regressao_req_igual": rows[1]["Total Request Count"] = 2
+    elif mode == "regressao_req_distinto": rows[2]["Total Request Count"] = 5
+    elif mode == "regressao_falhas":
+        rows[0]["Total Failure Count"] = 1
+    elif mode == "falhas_excedentes": rows[1]["Total Failure Count"] = 7
+    elif mode == "delta_falhas_excedente": rows[1]["Total Failure Count"] = 4
+    elif mode == "negativo": rows[1]["Total Request Count"] = -1
+    elif mode == "fracionario": rows[1]["Total Failure Count"] = .5
+    elif mode == "nan": rows[1]["Total Request Count"] = "nan"
+    elif mode == "inf": rows[1]["Total Failure Count"] = "inf"
+    elif mode == "coluna_ausente": rows[1].pop("Total Failure Count")
+    elif mode == "valor_vazio": rows[1]["Total Failure Count"] = ""
+    elif mode == "usuarios_negativos": rows[1]["User Count"] = -1
+    else: rows[1]["Timestamp"] = "inf"
+    with pytest.raises((ValueError, KeyError)):
+        carga.historico_na_janela(rows, 100.5, 104.5, {})
+
+
+def test_timestamp_repetido_contadores_estaveis_e_fronteiras():
+    rows = snapshots_contadores()
+    rows[1]["Total Request Count"] = 3  # Nenhuma conclusão nova: ainda é compatível.
+    audit = {}
+    selected = carga.historico_na_janela(rows, 101.2, 103.2, audit)
+    assert selected == rows[2:3]
+    assert len(audit["snapshots_fronteira"]) == 3  # Mantém ambos os registros do bucket inicial.
+
+
+def test_reset_rampa_nao_confundido_com_regressao_janela():
+    rows = snapshots_contadores()
+    rows.insert(0, {"Timestamp": 100, "User Count": 0, "Total Request Count": 20, "Total Failure Count": 2})
+    assert carga.historico_na_janela(rows, 100.5, 104.5, {}) == rows[1:]
+
+
+@pytest.mark.parametrize("wrong_users", [None, 0, 9])
+def test_fase_repetidos_preserva_validacao_de_usuarios(tmp_path, wrong_users):
+    diagnostic = aquecimento_dez_usuarios(tmp_path)
+    start = datetime.fromisoformat(diagnostic["usuarios_prontos_utc"]).timestamp()
+    rows = [{"Name": "Aggregated", "Timestamp": int(start) + t, "User Count": count,
+             "Total Request Count": req, "Total Failure Count": 0}
+            for t,count,req in [(1,10,3), (1,10 if wrong_users is None else wrong_users,6), (2,10,8)]]
+    # Fixture aceita schemas mínimos; grava contadores para esta regressão.
+    with (tmp_path / "aquecimento_stats_history.csv").open("w", newline="", encoding="utf-8") as f:
+        writer = csv.DictWriter(f,fieldnames=list(rows[0])); writer.writeheader(); writer.writerows(rows)
+    errors = carga.validar_fase(tmp_path, "aquecimento", 10, diagnostic)
+    assert bool(errors) == (wrong_users is not None)
+
+
+def test_mesmo_segundo_nao_inventa_duracao_da_janela(tmp_path):
+    diagnostic = aquecimento_dez_usuarios(tmp_path)
+    stamp = int(datetime.fromisoformat(diagnostic["usuarios_prontos_utc"]).timestamp()) + 1
+    path = tmp_path / "aquecimento_stats_history.csv"
+    rows = [{"Name": "Aggregated", "Timestamp": value, "User Count": 10,
+             "Total Request Count": n, "Total Failure Count": 0}
+            for value,n in [(str(stamp),3), (str(stamp)+".0",6)]]
+    with path.open("w",newline="",encoding="utf-8") as f:
+        writer = csv.DictWriter(f,fieldnames=list(rows[0])); writer.writeheader(); writer.writerows(rows)
+    assert any("Sem dois snapshots" in e for e in carga.validar_fase(tmp_path,"aquecimento",10,diagnostic))

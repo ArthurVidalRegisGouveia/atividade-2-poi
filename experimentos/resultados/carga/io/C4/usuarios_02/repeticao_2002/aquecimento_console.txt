@@ -1,0 +1,36 @@
+[2026-10-08 20:04:45,310] DESKTOP-ASP1NE3/INFO/locust.main: Starting Locust 2.46.7
+[2026-10-08 20:04:45,312] DESKTOP-ASP1NE3/INFO/locust.main: Run time limit set to 30 seconds
+[2026-10-08 20:04:45,314] DESKTOP-ASP1NE3/INFO/locust.runners: Ramping to 2 users at a rate of 2.00 per second
+[2026-10-08 20:04:45,314] DESKTOP-ASP1NE3/INFO/locust.runners: All users spawned: {"UsuarioCPU": 2} (2 total users)
+[2026-10-08 20:04:45,314] DESKTOP-ASP1NE3/INFO/locust.runners: Resetting stats
+
+[2026-10-08 20:05:14,336] DESKTOP-ASP1NE3/INFO/locust.runners: Ramping to 0 users at a rate of 100.00 per second
+[2026-10-08 20:05:14,387] DESKTOP-ASP1NE3/INFO/locust.main: --run-time limit reached, shutting down
+Traceback (most recent call last):
+  File "src/gevent/greenlet.py", line 912, in gevent._gevent_cgreenlet.Greenlet.run
+  File "D:\atividade-2-poi\.venv\Lib\site-packages\locust\user\users.py", line 226, in stop
+    raise Exception(f"Tried to stop User in an unexpected state: {self._state}. This should never happen.")
+Exception: Tried to stop User in an unexpected state: stopping. This should never happen.
+2026-10-08T23:05:14Z <Greenlet at 0x1e17d2de2a0: <bound method User.stop of <locustfile.UsuarioCPU object at 0x000001E17D2F9810>>(force=False)> failed with Exception
+
+Traceback (most recent call last):
+  File "src/gevent/greenlet.py", line 912, in gevent._gevent_cgreenlet.Greenlet.run
+  File "D:\atividade-2-poi\.venv\Lib\site-packages\locust\user\users.py", line 226, in stop
+    raise Exception(f"Tried to stop User in an unexpected state: {self._state}. This should never happen.")
+Exception: Tried to stop User in an unexpected state: stopping. This should never happen.
+2026-10-08T23:05:14Z <Greenlet at 0x1e17d5636a0: <bound method User.stop of <locustfile.UsuarioCPU object at 0x000001E17D2EDA90>>(force=False)> failed with Exception
+
+[2026-10-08 20:05:14,576] DESKTOP-ASP1NE3/INFO/locust.main: Shutting down (exit code 0)
+Type     Name                                                                          # reqs      # fails |    Avg     Min     Max    Med |   req/s  failures/s
+--------|----------------------------------------------------------------------------|-------|-------------|-------|-------|-------|-------|--------|-----------
+GET      /arquivo                                                                         166     0(0.00%) |    352     213     702    350 |    5.68        0.00
+--------|----------------------------------------------------------------------------|-------|-------------|-------|-------|-------|-------|--------|-----------
+         Aggregated                                                                       166     0(0.00%) |    352     213     702    350 |    5.68        0.00
+
+Response time percentiles (approximated)
+Type     Name                                                                                  50%    66%    75%    80%    90%    95%    98%    99%  99.9% 99.99%   100% # reqs
+--------|--------------------------------------------------------------------------------|--------|------|------|------|------|------|------|------|------|------|------|------
+GET      /arquivo                                                                              350    380    390    400    470    480    520    650    700    700    700    166
+--------|--------------------------------------------------------------------------------|--------|------|------|------|------|------|------|------|------|------|------|------
+         Aggregated                                                                            350    380    390    400    470    480    520    650    700    700    700    166
+

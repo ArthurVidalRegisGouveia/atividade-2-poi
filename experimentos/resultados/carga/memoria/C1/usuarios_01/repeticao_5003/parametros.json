@@ -1,0 +1,468 @@
+{
+  "parametros": {
+    "url": "http://127.0.0.1:8002",
+    "aplicacao": "memoria",
+    "tamanho_mb": 50,
+    "operacoes": null,
+    "retencao_segundos": null,
+    "fsync": null,
+    "config_servidor": "D:\\atividade-2-poi\\experimentos\\resultados\\orquestracao\\definitivos_C1_01\\memoria_C1_u01_r5003\\servidor_verificado.json",
+    "cenario": "C1",
+    "usuarios": 1,
+    "taxa": 1.0,
+    "duracao": 60,
+    "aquecimento": 30,
+    "limite": 100000,
+    "espera": 0.0,
+    "repeticao": 5003,
+    "somente_preparar": false,
+    "conexoes": "fechar",
+    "registrar_worker_pid": true,
+    "verificacao_relogio": "D:\\atividade-2-poi\\experimentos\\resultados\\orquestracao\\definitivos_C1_01\\memoria_C1_u01_r5003\\relogio_antes.json",
+    "limite_latencias": 100000
+  },
+  "aplicacao": "memoria",
+  "endpoint": "/memoria",
+  "parametros_http": {
+    "tamanho_mb": 50
+  },
+  "configuracao_servidor_declarada": {
+    "MEMORY_LIMITE_MIN_MB": 1,
+    "MEMORY_LIMITE_MAX_MB": 64,
+    "MEMORY_MAX_SIMULTANEAS": 4,
+    "MEMORY_RETENCAO_SEGUNDOS": 1.0
+  },
+  "configuracao_servidor_verificada": true,
+  "provisionamento_planejado": {
+    "vcpus": 1,
+    "ram_gib": 1,
+    "workers": 1
+  },
+  "provisionamento_verificado_automaticamente": false,
+  "python": "3.14.3 (tags/v3.14.3:323c59a, Feb  3 2026, 16:04:56) [MSC v.1944 64 bit (AMD64)]",
+  "locust": "2.46.7",
+  "modelo": "fechado",
+  "politica_espera": "fixa após cada resposta",
+  "timeout_http_s": 30,
+  "stop_timeout_s": 35,
+  "duracoes_incluem_rampa": true,
+  "aquecimento_em_processo_separado": true,
+  "entrada_interativa": "desabilitada (stdin pipe fechado; NUL pode ser tty no Windows)",
+  "criado_utc": "2026-10-09T16:05:59.566194+00:00",
+  "fases": [
+    {
+      "fase": "aquecimento",
+      "comando": [
+        "python",
+        "-m",
+        "locust",
+        "-f",
+        ".\\scripts\\carga\\locustfile.py",
+        "--headless",
+        "--host",
+        "http://127.0.0.1:8002",
+        "--users",
+        "1",
+        "--spawn-rate",
+        "1.0",
+        "--run-time",
+        "30s",
+        "--limite",
+        "100000",
+        "--espera",
+        "0.0",
+        "--reset-stats",
+        "--csv",
+        ".\\experimentos\\resultados\\carga\\memoria\\C1\\usuarios_01\\repeticao_5003\\aquecimento",
+        "--csv-full-history",
+        "--only-summary",
+        "--stop-timeout",
+        "35",
+        "--exit-code-on-error",
+        "1",
+        "--conexoes",
+        "fechar",
+        "--diagnostico-saida",
+        ".\\experimentos\\resultados\\carga\\memoria\\C1\\usuarios_01\\repeticao_5003\\aquecimento_instrumentacao.json",
+        "--registrar-worker-pid",
+        "--aplicacao",
+        "memoria",
+        "--tamanho-mb",
+        "50"
+      ],
+      "estado": "concluido",
+      "inicio_utc": "2026-10-09T16:05:59.567141+00:00",
+      "codigo_saida": 0,
+      "instrumentacao": {
+        "conexoes": "fechar",
+        "usuarios_solicitados": 1,
+        "eventos_usuarios": [
+          {
+            "utc": "2026-10-09T16:06:01.308930+00:00",
+            "usuarios": 1
+          }
+        ],
+        "aplicacao": "memoria",
+        "registrar_worker_pid": true,
+        "fase_inicio_utc": "2026-10-09T16:06:01.307323+00:00",
+        "usuarios_prontos_utc": "2026-10-09T16:06:01.308944+00:00",
+        "pids_janela": {
+          "1150/HTTP_200": 28
+        },
+        "encerramento_inicio_utc": "2026-10-09T16:06:30.493294+00:00",
+        "pids_apos_encerramento": {
+          "1150/HTTP_200": 29
+        },
+        "fase_fim_utc": "2026-10-09T16:06:31.126830+00:00"
+      },
+      "validacao_historico": {
+        "politica": "Timestamp inteiro representa [t,t+1); somente buckets inteiramente na janela",
+        "snapshots_disponiveis": 30,
+        "snapshots_inteiros_na_janela": 28,
+        "snapshots_timestamp_repetido": 0,
+        "contadores_acumulados_presentes": true,
+        "snapshots_fronteira": [
+          {
+            "timestamp": "1791561961",
+            "usuarios": 0
+          },
+          {
+            "timestamp": "1791561990",
+            "usuarios": 1
+          }
+        ]
+      },
+      "erros_validacao": [],
+      "fim_utc": "2026-10-09T16:06:31.240164+00:00",
+      "tempo_parede_s": 31.672675999987405
+    },
+    {
+      "fase": "medicao",
+      "comando": [
+        "python",
+        "-m",
+        "locust",
+        "-f",
+        ".\\scripts\\carga\\locustfile.py",
+        "--headless",
+        "--host",
+        "http://127.0.0.1:8002",
+        "--users",
+        "1",
+        "--spawn-rate",
+        "1.0",
+        "--run-time",
+        "60s",
+        "--limite",
+        "100000",
+        "--espera",
+        "0.0",
+        "--reset-stats",
+        "--csv",
+        ".\\experimentos\\resultados\\carga\\memoria\\C1\\usuarios_01\\repeticao_5003\\medicao",
+        "--csv-full-history",
+        "--only-summary",
+        "--stop-timeout",
+        "35",
+        "--exit-code-on-error",
+        "1",
+        "--conexoes",
+        "fechar",
+        "--diagnostico-saida",
+        ".\\experimentos\\resultados\\carga\\memoria\\C1\\usuarios_01\\repeticao_5003\\medicao_instrumentacao.json",
+        "--registrar-worker-pid",
+        "--aplicacao",
+        "memoria",
+        "--tamanho-mb",
+        "50",
+        "--latencias-saida",
+        ".\\experimentos\\resultados\\carga\\memoria\\C1\\usuarios_01\\repeticao_5003\\medicao_latencias.csv",
+        "--limite-latencias",
+        "100000"
+      ],
+      "estado": "concluido",
+      "inicio_utc": "2026-10-09T16:06:31.241079+00:00",
+      "codigo_saida": 0,
+      "instrumentacao": {
+        "conexoes": "fechar",
+        "usuarios_solicitados": 1,
+        "eventos_usuarios": [
+          {
+            "utc": "2026-10-09T16:06:32.994462+00:00",
+            "usuarios": 1
+          }
+        ],
+        "aplicacao": "memoria",
+        "registrar_worker_pid": true,
+        "fase_inicio_utc": "2026-10-09T16:06:32.992666+00:00",
+        "usuarios_prontos_utc": "2026-10-09T16:06:32.994481+00:00",
+        "pids_janela": {
+          "1150/HTTP_200": 56
+        },
+        "encerramento_inicio_utc": "2026-10-09T16:07:32.155165+00:00",
+        "latencias": {
+          "registros": 56,
+          "descartados": 0,
+          "invalidos": 0,
+          "limite": 100000,
+          "erros_escrita": 0,
+          "completo": true,
+          "unidade": "ms",
+          "timestamp": "UTC de conclusão no evento request do Locust",
+          "percentil": "empírico: posto ceil(0.95*n), sem arredondamento Locust"
+        },
+        "pids_apos_encerramento": {
+          "1150/HTTP_200": 57
+        },
+        "fase_fim_utc": "2026-10-09T16:07:32.644248+00:00"
+      },
+      "validacao_historico": {
+        "politica": "Timestamp inteiro representa [t,t+1); somente buckets inteiramente na janela",
+        "snapshots_disponiveis": 60,
+        "snapshots_inteiros_na_janela": 58,
+        "snapshots_timestamp_repetido": 0,
+        "contadores_acumulados_presentes": true,
+        "snapshots_fronteira": [
+          {
+            "timestamp": "1791561992",
+            "usuarios": 0
+          },
+          {
+            "timestamp": "1791562052",
+            "usuarios": 1
+          }
+        ]
+      },
+      "erros_validacao": [],
+      "fim_utc": "2026-10-09T16:07:32.766254+00:00",
+      "tempo_parede_s": 61.524741700006416
+    }
+  ],
+  "verificacao_relogio": {
+    "url": "http://127.0.0.1:8002",
+    "coletado_utc": "2026-10-09T16:05:57.401089+00:00",
+    "amostras": [
+      {
+        "offset_servidor_menos_cliente_min_s": -0.191991,
+        "offset_servidor_menos_cliente_max_s": -0.119223,
+        "offset_estimado_s": -0.155607,
+        "incerteza_meia_faixa_s": 0.036384,
+        "rtt_monotonico_s": 0.07333789998665452,
+        "tempo_servidor_s": 0.000577,
+        "transito_e_overhead_s": 0.072768,
+        "t1_utc": "2026-10-09T16:05:57.297956+00:00",
+        "t2_utc": "2026-10-09T16:05:57.178733+00:00",
+        "t3_utc": "2026-10-09T16:05:57.179310+00:00",
+        "t4_utc": "2026-10-09T16:05:57.371301+00:00"
+      },
+      {
+        "offset_servidor_menos_cliente_min_s": -0.191934,
+        "offset_servidor_menos_cliente_max_s": -0.188367,
+        "offset_estimado_s": -0.1901505,
+        "incerteza_meia_faixa_s": 0.0017834999999999934,
+        "rtt_monotonico_s": 0.004067300003953278,
+        "tempo_servidor_s": 0.000505,
+        "transito_e_overhead_s": 0.003567,
+        "t1_utc": "2026-10-09T16:05:57.371349+00:00",
+        "t2_utc": "2026-10-09T16:05:57.182982+00:00",
+        "t3_utc": "2026-10-09T16:05:57.183487+00:00",
+        "t4_utc": "2026-10-09T16:05:57.375421+00:00"
+      },
+      {
+        "offset_servidor_menos_cliente_min_s": -0.191866,
+        "offset_servidor_menos_cliente_max_s": -0.186426,
+        "offset_estimado_s": -0.189146,
+        "incerteza_meia_faixa_s": 0.00272,
+        "rtt_monotonico_s": 0.006014400016283616,
+        "tempo_servidor_s": 0.000577,
+        "transito_e_overhead_s": 0.0054399999999999995,
+        "t1_utc": "2026-10-09T16:05:57.375471+00:00",
+        "t2_utc": "2026-10-09T16:05:57.189045+00:00",
+        "t3_utc": "2026-10-09T16:05:57.189622+00:00",
+        "t4_utc": "2026-10-09T16:05:57.381488+00:00"
+      },
+      {
+        "offset_servidor_menos_cliente_min_s": -0.191965,
+        "offset_servidor_menos_cliente_max_s": -0.18705,
+        "offset_estimado_s": -0.1895075,
+        "incerteza_meia_faixa_s": 0.0024575000000000014,
+        "rtt_monotonico_s": 0.005454400001326576,
+        "tempo_servidor_s": 0.000542,
+        "transito_e_overhead_s": 0.004915,
+        "t1_utc": "2026-10-09T16:05:57.381525+00:00",
+        "t2_utc": "2026-10-09T16:05:57.194475+00:00",
+        "t3_utc": "2026-10-09T16:05:57.195017+00:00",
+        "t4_utc": "2026-10-09T16:05:57.386982+00:00"
+      },
+      {
+        "offset_servidor_menos_cliente_min_s": -0.192432,
+        "offset_servidor_menos_cliente_max_s": -0.178961,
+        "offset_estimado_s": -0.1856965,
+        "incerteza_meia_faixa_s": 0.0067354999999999915,
+        "rtt_monotonico_s": 0.014013899985002354,
+        "tempo_servidor_s": 0.000547,
+        "transito_e_overhead_s": 0.013470999999999999,
+        "t1_utc": "2026-10-09T16:05:57.387019+00:00",
+        "t2_utc": "2026-10-09T16:05:57.208058+00:00",
+        "t3_utc": "2026-10-09T16:05:57.208605+00:00",
+        "t4_utc": "2026-10-09T16:05:57.401037+00:00"
+      }
+    ],
+    "menor_incerteza": {
+      "offset_servidor_menos_cliente_min_s": -0.191934,
+      "offset_servidor_menos_cliente_max_s": -0.188367,
+      "offset_estimado_s": -0.1901505,
+      "incerteza_meia_faixa_s": 0.0017834999999999934,
+      "rtt_monotonico_s": 0.004067300003953278,
+      "tempo_servidor_s": 0.000505,
+      "transito_e_overhead_s": 0.003567,
+      "t1_utc": "2026-10-09T16:05:57.371349+00:00",
+      "t2_utc": "2026-10-09T16:05:57.182982+00:00",
+      "t3_utc": "2026-10-09T16:05:57.183487+00:00",
+      "t4_utc": "2026-10-09T16:05:57.375421+00:00"
+    },
+    "modelo": "offset servidor-cliente; estimativa assume trânsito simétrico",
+    "sincronizacao_confirmada_automaticamente": false
+  },
+  "verificacao_ambiente": {
+    "cpus": 1,
+    "ram_total_bytes": 1018466304,
+    "servidores": [
+      {
+        "aplicacao": "memoria",
+        "pid_principal": 1150,
+        "workers": 1,
+        "processos": [
+          {
+            "pid": 1150,
+            "criado_epoch_s": 1791553592.85,
+            "ppid": 1,
+            "comando": [
+              ".venv/bin/python",
+              "-m",
+              "uvicorn",
+              "scripts.monitoramento.servidor_experimental:criar_app",
+              "--factory",
+              "--host",
+              "0.0.0.0",
+              "--port",
+              "8002",
+              "--workers",
+              "1"
+            ],
+            "variaveis_relevantes": {
+              "MEMORY_RETENCAO_SEGUNDOS": "1"
+            },
+            "defaults_utilizados": {
+              "MEMORY_LIMITE_MIN_MB": "1",
+              "MEMORY_LIMITE_MAX_MB": "64",
+              "MEMORY_MAX_SIMULTANEAS": "4"
+            }
+          }
+        ],
+        "configuracao_verificada": {
+          "MEMORY_LIMITE_MIN_MB": 1,
+          "MEMORY_LIMITE_MAX_MB": 64,
+          "MEMORY_MAX_SIMULTANEAS": 4,
+          "MEMORY_RETENCAO_SEGUNDOS": 1.0
+        },
+        "defaults_auditados": {
+          "MEMORY_LIMITE_MIN_MB": "1",
+          "MEMORY_LIMITE_MAX_MB": "64",
+          "MEMORY_MAX_SIMULTANEAS": "4",
+          "MEMORY_RETENCAO_SEGUNDOS": "0"
+        },
+        "codigo_sha256": "6c325fc100afc22058ce5737a8b5283d1c74b9fede653939be94611d00880a4b",
+        "diretorio_io": null,
+        "espaco_io_livre_bytes": null
+      }
+    ],
+    "resultados_escrita": true
+  },
+  "verificacao_relogio_posterior": {
+    "url": "http://127.0.0.1:8002",
+    "coletado_utc": "2026-10-09T16:07:33.071374+00:00",
+    "amostras": [
+      {
+        "offset_servidor_menos_cliente_min_s": -0.191032,
+        "offset_servidor_menos_cliente_max_s": -0.134895,
+        "offset_estimado_s": -0.16296349999999998,
+        "incerteza_meia_faixa_s": 0.02806850000000001,
+        "rtt_monotonico_s": 0.05665179999778047,
+        "tempo_servidor_s": 0.000522,
+        "transito_e_overhead_s": 0.056137,
+        "t1_utc": "2026-10-09T16:07:32.961559+00:00",
+        "t2_utc": "2026-10-09T16:07:32.826664+00:00",
+        "t3_utc": "2026-10-09T16:07:32.827186+00:00",
+        "t4_utc": "2026-10-09T16:07:33.018218+00:00"
+      },
+      {
+        "offset_servidor_menos_cliente_min_s": -0.191382,
+        "offset_servidor_menos_cliente_max_s": -0.178429,
+        "offset_estimado_s": -0.1849055,
+        "incerteza_meia_faixa_s": 0.006476499999999996,
+        "rtt_monotonico_s": 0.01376269999309443,
+        "tempo_servidor_s": 0.000813,
+        "transito_e_overhead_s": 0.012953000000000001,
+        "t1_utc": "2026-10-09T16:07:33.018263+00:00",
+        "t2_utc": "2026-10-09T16:07:32.839834+00:00",
+        "t3_utc": "2026-10-09T16:07:32.840647+00:00",
+        "t4_utc": "2026-10-09T16:07:33.032029+00:00"
+      },
+      {
+        "offset_servidor_menos_cliente_min_s": -0.191329,
+        "offset_servidor_menos_cliente_max_s": -0.178498,
+        "offset_estimado_s": -0.1849135,
+        "incerteza_meia_faixa_s": 0.0064155000000000045,
+        "rtt_monotonico_s": 0.01337140001123771,
+        "tempo_servidor_s": 0.000543,
+        "transito_e_overhead_s": 0.012831,
+        "t1_utc": "2026-10-09T16:07:33.032068+00:00",
+        "t2_utc": "2026-10-09T16:07:32.853570+00:00",
+        "t3_utc": "2026-10-09T16:07:32.854113+00:00",
+        "t4_utc": "2026-10-09T16:07:33.045442+00:00"
+      },
+      {
+        "offset_servidor_menos_cliente_min_s": -0.191539,
+        "offset_servidor_menos_cliente_max_s": -0.178591,
+        "offset_estimado_s": -0.18506499999999998,
+        "incerteza_meia_faixa_s": 0.006473999999999994,
+        "rtt_monotonico_s": 0.01349139999365434,
+        "tempo_servidor_s": 0.000546,
+        "transito_e_overhead_s": 0.012948000000000001,
+        "t1_utc": "2026-10-09T16:07:33.045479+00:00",
+        "t2_utc": "2026-10-09T16:07:32.866888+00:00",
+        "t3_utc": "2026-10-09T16:07:32.867434+00:00",
+        "t4_utc": "2026-10-09T16:07:33.058973+00:00"
+      },
+      {
+        "offset_servidor_menos_cliente_min_s": -0.191265,
+        "offset_servidor_menos_cliente_max_s": -0.179515,
+        "offset_estimado_s": -0.18539,
+        "incerteza_meia_faixa_s": 0.005874999999999991,
+        "rtt_monotonico_s": 0.012317500018980354,
+        "tempo_servidor_s": 0.00057,
+        "transito_e_overhead_s": 0.01175,
+        "t1_utc": "2026-10-09T16:07:33.059010+00:00",
+        "t2_utc": "2026-10-09T16:07:32.879495+00:00",
+        "t3_utc": "2026-10-09T16:07:32.880065+00:00",
+        "t4_utc": "2026-10-09T16:07:33.071330+00:00"
+      }
+    ],
+    "menor_incerteza": {
+      "offset_servidor_menos_cliente_min_s": -0.191265,
+      "offset_servidor_menos_cliente_max_s": -0.179515,
+      "offset_estimado_s": -0.18539,
+      "incerteza_meia_faixa_s": 0.005874999999999991,
+      "rtt_monotonico_s": 0.012317500018980354,
+      "tempo_servidor_s": 0.00057,
+      "transito_e_overhead_s": 0.01175,
+      "t1_utc": "2026-10-09T16:07:33.059010+00:00",
+      "t2_utc": "2026-10-09T16:07:32.879495+00:00",
+      "t3_utc": "2026-10-09T16:07:32.880065+00:00",
+      "t4_utc": "2026-10-09T16:07:33.071330+00:00"
+    },
+    "modelo": "offset servidor-cliente; estimativa assume trânsito simétrico",
+    "sincronizacao_confirmada_automaticamente": false
+  }
+}

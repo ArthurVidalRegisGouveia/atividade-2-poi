@@ -29,6 +29,20 @@ def test_matriz_completa_parametros_e_reserva():
     assert orch.matriz(options("--tentativa", "2"))[0]["repeticao"] == 1011
 
 
+def test_recuperacao_c3_r3012_e_filtros_das_16_planejadas():
+    common = ["--id-execucao", "definitivos_C3_01", "--cenario", "C3", "--base-repeticao", "3000"]
+    def jobs(*args):
+        return orch.matriz(orch.parser().parse_args([*common, *args]))
+    retry = jobs("--aplicacao", "cpu", "--usuarios", "10", "--repeticao", "2", "--tentativa", "2")
+    assert len(retry) == 1 and retry[0]["repeticao"] == 3012
+    assert retry[0]["repeticao_logica"] == 2 and retry[0]["tentativa"] == 2
+    cpu = jobs("--aplicacao", "cpu", "--usuarios", "10", "--repeticao", "3")
+    io, memory = jobs("--aplicacao", "io"), jobs("--aplicacao", "memoria")
+    assert [len(cpu), len(io), len(memory)] == [1, 6, 9]
+    assert cpu[0]["repeticao"] == 3003
+    assert not any(j["aplicacao"] == "cpu" and j["repeticao"] == 3002 for j in [*cpu, *io, *memory])
+
+
 def test_recuperacao_r2002_nova_tentativa_preserva_falha(tmp_path, monkeypatch):
     monkeypatch.setattr(orch, "ROOT", tmp_path)
     args = ["--id-execucao", "recuperacao", "--cenario", "C4", "--aplicacao", "io",

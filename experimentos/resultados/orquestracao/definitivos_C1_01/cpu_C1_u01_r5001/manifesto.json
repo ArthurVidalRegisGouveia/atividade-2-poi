@@ -1,0 +1,360 @@
+{
+  "job": {
+    "aplicacao": "cpu",
+    "cenario": "C1",
+    "usuarios": 1,
+    "repeticao": 5001,
+    "repeticao_logica": 1,
+    "tentativa": 1,
+    "caminho": "experimentos/resultados/carga/cpu/C1/usuarios_01/repeticao_5001",
+    "aquecimento_s": 30,
+    "medicao_configurada_s": 60,
+    "espera_s": 0,
+    "conexoes": "fechar",
+    "taxa": 1,
+    "parametros_http": {
+      "limite": 250000
+    }
+  },
+  "estado": "falha",
+  "criado_utc": "2026-10-09T13:48:23.079712+00:00",
+  "manifesto": "D:\\atividade-2-poi\\experimentos\\resultados\\orquestracao\\definitivos_C1_01\\cpu_C1_u01_r5001\\manifesto.json",
+  "vm_nome_declarado": "POI-Ubuntu-Server",
+  "provisionamento_confirmado": null,
+  "comandos_planejados": {
+    "locust": [
+      "D:\\atividade-2-poi\\.venv\\Scripts\\python.exe",
+      "-B",
+      "D:\\atividade-2-poi\\scripts\\carga\\executar_locust.py",
+      "--aplicacao",
+      "cpu",
+      "--cenario",
+      "C1",
+      "--usuarios",
+      "1",
+      "--repeticao",
+      "5001",
+      "--taxa",
+      "1",
+      "--aquecimento",
+      "30",
+      "--duracao",
+      "60",
+      "--espera",
+      "0",
+      "--conexoes",
+      "fechar",
+      "--registrar-worker-pid",
+      "--verificacao-relogio",
+      "D:\\atividade-2-poi\\experimentos\\resultados\\orquestracao\\definitivos_C1_01\\cpu_C1_u01_r5001\\relogio_antes.json",
+      "--config-servidor",
+      "D:\\atividade-2-poi\\experimentos\\resultados\\orquestracao\\definitivos_C1_01\\cpu_C1_u01_r5001\\servidor_verificado.json",
+      "--limite",
+      "250000"
+    ]
+  },
+  "inicio_utc": "2026-10-09T13:49:26.863722+00:00",
+  "token_monitor": "f3f54348-d4f4-4582-9a85-31f4e88f03ab",
+  "comandos": [
+    {
+      "comando": [
+        "ssh",
+        "-o",
+        "BatchMode=yes",
+        "-o",
+        "ConnectTimeout=10",
+        "-p",
+        "2222",
+        "osboxes@127.0.0.1",
+        "/home/osboxes/atividade-2-poi/.venv/bin/python /home/osboxes/atividade-2-poi/scripts/experimentacao/agente_linux.py"
+      ],
+      "inicio_utc": "2026-10-09T13:49:28.418718+00:00",
+      "entrada_json": {
+        "acao": "auditar",
+        "aplicacoes": [
+          "cpu"
+        ]
+      },
+      "codigo_saida": 0,
+      "fim_utc": "2026-10-09T13:49:29.219196+00:00"
+    },
+    {
+      "comando": [
+        "D:\\atividade-2-poi\\.venv\\Scripts\\python.exe",
+        "-B",
+        "D:\\atividade-2-poi\\scripts\\monitoramento\\verificar_relogios.py",
+        "--url",
+        "http://127.0.0.1:8001",
+        "--saida",
+        "D:\\atividade-2-poi\\experimentos\\resultados\\orquestracao\\definitivos_C1_01\\cpu_C1_u01_r5001\\relogio_antes.json"
+      ],
+      "inicio_utc": "2026-10-09T13:49:29.284109+00:00",
+      "codigo_saida": 0,
+      "fim_utc": "2026-10-09T13:49:29.618509+00:00"
+    },
+    {
+      "comando": [
+        "ssh",
+        "-o",
+        "BatchMode=yes",
+        "-o",
+        "ConnectTimeout=10",
+        "-p",
+        "2222",
+        "osboxes@127.0.0.1",
+        "/home/osboxes/atividade-2-poi/.venv/bin/python /home/osboxes/atividade-2-poi/scripts/experimentacao/agente_linux.py"
+      ],
+      "inicio_utc": "2026-10-09T13:49:29.618583+00:00",
+      "entrada_json": {
+        "acao": "iniciar",
+        "token": "f3f54348-d4f4-4582-9a85-31f4e88f03ab",
+        "job": {
+          "aplicacao": "cpu",
+          "cenario": "C1",
+          "usuarios": 1,
+          "repeticao": 5001,
+          "repeticao_logica": 1,
+          "tentativa": 1,
+          "caminho": "experimentos/resultados/carga/cpu/C1/usuarios_01/repeticao_5001",
+          "aquecimento_s": 30,
+          "medicao_configurada_s": 60,
+          "espera_s": 0,
+          "conexoes": "fechar",
+          "taxa": 1,
+          "parametros_http": {
+            "limite": 250000
+          }
+        },
+        "pid": 1149,
+        "servidor_criado_epoch_s": 1791553589.99,
+        "duracao": 200
+      },
+      "codigo_saida": 0,
+      "fim_utc": "2026-10-09T13:49:29.919684+00:00"
+    },
+    {
+      "comando": [
+        "ssh",
+        "-o",
+        "BatchMode=yes",
+        "-o",
+        "ConnectTimeout=10",
+        "-p",
+        "2222",
+        "osboxes@127.0.0.1",
+        "/home/osboxes/atividade-2-poi/.venv/bin/python /home/osboxes/atividade-2-poi/scripts/experimentacao/agente_linux.py"
+      ],
+      "inicio_utc": "2026-10-09T13:49:29.919755+00:00",
+      "entrada_json": {
+        "acao": "estado",
+        "token": "f3f54348-d4f4-4582-9a85-31f4e88f03ab"
+      },
+      "codigo_saida": 0,
+      "fim_utc": "2026-10-09T13:49:30.230172+00:00"
+    },
+    {
+      "comando": [
+        "ssh",
+        "-o",
+        "BatchMode=yes",
+        "-o",
+        "ConnectTimeout=10",
+        "-p",
+        "2222",
+        "osboxes@127.0.0.1",
+        "/home/osboxes/atividade-2-poi/.venv/bin/python /home/osboxes/atividade-2-poi/scripts/experimentacao/agente_linux.py"
+      ],
+      "inicio_utc": "2026-10-09T13:49:31.230783+00:00",
+      "entrada_json": {
+        "acao": "estado",
+        "token": "f3f54348-d4f4-4582-9a85-31f4e88f03ab"
+      },
+      "codigo_saida": 0,
+      "fim_utc": "2026-10-09T13:49:31.518180+00:00"
+    },
+    {
+      "comando": [
+        "D:\\atividade-2-poi\\.venv\\Scripts\\python.exe",
+        "-B",
+        "D:\\atividade-2-poi\\scripts\\carga\\executar_locust.py",
+        "--aplicacao",
+        "cpu",
+        "--cenario",
+        "C1",
+        "--usuarios",
+        "1",
+        "--repeticao",
+        "5001",
+        "--taxa",
+        "1",
+        "--aquecimento",
+        "30",
+        "--duracao",
+        "60",
+        "--espera",
+        "0",
+        "--conexoes",
+        "fechar",
+        "--registrar-worker-pid",
+        "--verificacao-relogio",
+        "D:\\atividade-2-poi\\experimentos\\resultados\\orquestracao\\definitivos_C1_01\\cpu_C1_u01_r5001\\relogio_antes.json",
+        "--config-servidor",
+        "D:\\atividade-2-poi\\experimentos\\resultados\\orquestracao\\definitivos_C1_01\\cpu_C1_u01_r5001\\servidor_verificado.json",
+        "--limite",
+        "250000"
+      ],
+      "inicio_utc": "2026-10-09T13:49:31.518306+00:00",
+      "codigo_saida": 2,
+      "fim_utc": "2026-10-09T13:51:04.115888+00:00"
+    },
+    {
+      "comando": [
+        "D:\\atividade-2-poi\\.venv\\Scripts\\python.exe",
+        "-B",
+        "D:\\atividade-2-poi\\scripts\\monitoramento\\verificar_relogios.py",
+        "--url",
+        "http://127.0.0.1:8001",
+        "--saida",
+        "D:\\atividade-2-poi\\experimentos\\resultados\\orquestracao\\definitivos_C1_01\\cpu_C1_u01_r5001\\relogio_depois.json"
+      ],
+      "inicio_utc": "2026-10-09T13:51:04.116209+00:00",
+      "codigo_saida": 0,
+      "fim_utc": "2026-10-09T13:51:04.449496+00:00"
+    },
+    {
+      "comando": [
+        "ssh",
+        "-o",
+        "BatchMode=yes",
+        "-o",
+        "ConnectTimeout=10",
+        "-p",
+        "2222",
+        "osboxes@127.0.0.1",
+        "/home/osboxes/atividade-2-poi/.venv/bin/python /home/osboxes/atividade-2-poi/scripts/experimentacao/agente_linux.py"
+      ],
+      "inicio_utc": "2026-10-09T13:51:04.449558+00:00",
+      "entrada_json": {
+        "acao": "encerrar",
+        "token": "f3f54348-d4f4-4582-9a85-31f4e88f03ab"
+      },
+      "codigo_saida": 0,
+      "fim_utc": "2026-10-09T13:51:04.781985+00:00"
+    },
+    {
+      "comando": [
+        "ssh",
+        "-o",
+        "BatchMode=yes",
+        "-o",
+        "ConnectTimeout=10",
+        "-p",
+        "2222",
+        "osboxes@127.0.0.1",
+        "/home/osboxes/atividade-2-poi/.venv/bin/python /home/osboxes/atividade-2-poi/scripts/experimentacao/agente_linux.py"
+      ],
+      "inicio_utc": "2026-10-09T13:51:04.782073+00:00",
+      "entrada_json": {
+        "acao": "estado",
+        "token": "f3f54348-d4f4-4582-9a85-31f4e88f03ab"
+      },
+      "codigo_saida": 0,
+      "fim_utc": "2026-10-09T13:51:05.080760+00:00"
+    }
+  ],
+  "ambiente_verificado": {
+    "cpus": 1,
+    "ram_total_bytes": 1018466304,
+    "servidores": [
+      {
+        "aplicacao": "cpu",
+        "pid_principal": 1149,
+        "workers": 1,
+        "processos": [
+          {
+            "pid": 1149,
+            "criado_epoch_s": 1791553589.99,
+            "ppid": 1,
+            "comando": [
+              ".venv/bin/python",
+              "-m",
+              "uvicorn",
+              "apps.cpu_bound.main:app",
+              "--host",
+              "0.0.0.0",
+              "--port",
+              "8001",
+              "--workers",
+              "1"
+            ],
+            "variaveis_relevantes": {
+              "CPU_DIAGNOSTICO": "1"
+            },
+            "defaults_utilizados": {
+              "CPU_LIMITE_MAX": "1000000"
+            }
+          }
+        ],
+        "configuracao_verificada": {
+          "CPU_LIMITE_MAX": 1000000,
+          "CPU_DIAGNOSTICO": 1
+        },
+        "defaults_auditados": {
+          "CPU_LIMITE_MAX": "1000000",
+          "CPU_DIAGNOSTICO": "0"
+        },
+        "codigo_sha256": "fc037ecf70e9a61fffccf73fcf42bad57ff0e9f5b21e249aa0f0f84e4cc58e70",
+        "diretorio_io": null,
+        "espaco_io_livre_bytes": null
+      }
+    ],
+    "resultados_escrita": true
+  },
+  "monitor": {
+    "token": "f3f54348-d4f4-4582-9a85-31f4e88f03ab",
+    "pid": 1339,
+    "criado_epoch_s": 1791553768.76,
+    "comando": [
+      "/home/osboxes/atividade-2-poi/.venv/bin/python",
+      "-u",
+      "/home/osboxes/atividade-2-poi/scripts/monitoramento/monitorar_linux.py",
+      "--pid",
+      "1149",
+      "--aplicacao",
+      "cpu",
+      "--cenario",
+      "C1",
+      "--usuarios",
+      "1",
+      "--repeticao",
+      "5001",
+      "--intervalo",
+      "1",
+      "--duracao",
+      "200",
+      "--diagnostico-cpu",
+      "--condicoes",
+      "Orquestrador; token=f3f54348-d4f4-4582-9a85-31f4e88f03ab"
+    ],
+    "monitoramento": "/home/osboxes/atividade-2-poi/experimentos/resultados/carga/cpu/C1/usuarios_01/repeticao_5001/monitoramento_linux",
+    "job": {
+      "aplicacao": "cpu",
+      "cenario": "C1",
+      "usuarios": 1,
+      "repeticao": 5001,
+      "repeticao_logica": 1,
+      "tentativa": 1,
+      "caminho": "experimentos/resultados/carga/cpu/C1/usuarios_01/repeticao_5001",
+      "aquecimento_s": 30,
+      "medicao_configurada_s": 60,
+      "espera_s": 0,
+      "conexoes": "fechar",
+      "taxa": 1,
+      "parametros_http": {
+        "limite": 250000
+      }
+    }
+  },
+  "erro": "Falha: Locust retornou 2; confira D:\\atividade-2-poi\\experimentos\\resultados\\orquestracao\\definitivos_C1_01\\cpu_C1_u01_r5001\\locust_console.txt.",
+  "fim_utc": "2026-10-09T13:51:05.080824+00:00"
+}

@@ -1562,7 +1562,31 @@ deve ocorrer somente após autorização e definição da URL da organização.
 
 ## Execução futura no Ubuntu Server
 
-### Estatística dos experimentos definitivos C4
+### Estatística dos experimentos definitivos C1–C4
+
+Para comparar as quatro análises definitivas já geradas:
+
+```powershell
+$env:TEMP = 'D:\atividade-2-poi\.temp'
+$env:TMP = $env:TEMP
+$env:MPLCONFIGDIR = 'D:\atividade-2-poi\.temp\matplotlib'
+.\.venv\Scripts\python.exe -B scripts/analise/comparar_cenarios.py
+```
+
+O comparador usa exclusivamente `analise_final/C1` a `C4/agregados.csv` e exige
+os mesmos conjuntos de métricas/unidades, nove combinações e três repetições
+declaradas por cenário. Não reestima as estatísticas individuais; valida resumos,
+preserva ausências e identifica fontes por SHA-256. Produz CSVs longos, tabelas
+comparativas, diferenças absolutas/percentuais, 16 gráficos em PNG/SVG e relatório
+Markdown em `analise_final/comparativo_C1_C4`. A pasta precisa ser nova; outra
+versão pode usar `--saida experimentos/resultados/analise_final/comparativo_revisao_02`.
+
+C1→C2 e C3→C4 comparam aumento de RAM com vCPUs/workers constantes. C1→C3 e
+C2→C4 mudam vCPUs/workers conjuntamente, sem isolar causalidade. Barras mostram
+média e DP amostral, não IC. Percentuais com base zero ficam ausentes. CPU global
+é diagnóstica; RSS compartilhado e disco virtual exigem cautela. O relatório
+registra a atualização do Ubuntu, as recuperações e as informações que não podem
+ser revalidadas exclusivamente pelos agregados.
 
 No Windows, instale a dependência de gráficos somente no ambiente virtual:
 
@@ -1572,15 +1596,33 @@ $env:TMP = $env:TEMP
 .\.venv\Scripts\python.exe -m pip install --no-cache-dir -r requirements-analise.txt
 $env:MPLCONFIGDIR = 'D:\atividade-2-poi\.temp\matplotlib'
 .\.venv\Scripts\python.exe scripts/analise/analisar_definitivos.py
+
+# C3: saída padrão analise_final/C3, identificada pelo índice.
+.\.venv\Scripts\python.exe scripts/analise/analisar_definitivos.py --indice experimentos/resultados/orquestracao/definitivos_C3_01/indice.json --dispositivo sda
+
+# C4: pasta nova, preservando a análise C4 já existente.
+.\.venv\Scripts\python.exe scripts/analise/analisar_definitivos.py --indice experimentos/resultados/orquestracao/definitivos_C4_01/indice.json --saida experimentos/resultados/analise_final/C4_revisao_02 --dispositivo sda
 ```
 
-A ferramenta lê somente o índice de `definitivos_C4_01` e os consolidados
-referenciados nos manifestos concluídos. Exige três repetições lógicas distintas
-por combinação, exclui R2002 com falha e seleciona R2012 como repetição lógica 2.
-Valida identidade e janela útil, recusa duplicatas e não incorpora validações R1001.
+A ferramenta identifica um único cenário C1, C2, C3 ou C4 nos registros do índice;
+rejeita cenários misturados, inclusive entre registros históricos com falha.
+Sem `--indice`, mantém a campanha `definitivos_C4_01` como padrão por compatibilidade.
+Lê somente os consolidados referenciados nos manifestos concluídos e exige três
+repetições lógicas distintas por combinação. No C3, exclui R3002 com falha e
+seleciona R3012; no C4, exclui R2002 com falha e seleciona R2012, ambas como lógica 2.
+Valida identidade e janela útil e recusa tentativas concluídas duplicadas.
 Não regrava fontes nem recalcula sua correção de relógios.
 
-A saída padrão é `experimentos/resultados/analise_final/C4/`, com CSV individual,
+A base é inferida pelo plano do índice usando a convenção documentada
+`base = repeticao - 10*(tentativa - 1) - repeticao_logica`: múltiplo de 1000 a
+partir de 1000. O plano completo identifica a base da campanha; bases alternativas
+parciais ficam na auditoria e duas bases completas são rejeitadas como ambíguas.
+C3 usa base 3000 e C4 usa 2000 conforme seus registros. Não há mapa de bases
+presumidas para C1/C2: seus próprios índices determinam a numeração. Uma campanha
+definitiva válida na base 1000 pode usar R1001; o número sozinho não identifica
+validação. Testes exploratórios fora do índice não são procurados nem incorporados.
+
+A saída padrão é `experimentos/resultados/analise_final/<cenario>/`, com CSV individual,
 estatísticas por métrica (média, DP amostral, mínimo, máximo, n válido), avisos,
 auditoria SHA-256, relatório Markdown e cinco gráficos em PNG/SVG. CPU global é
 diagnóstica e separada da CPU da árvore. P95 agregado significa média entre p95
@@ -1591,9 +1633,25 @@ O script recusa saída preexistente. Para gerar outra versão sem substituir a
 anterior, informe uma pasta nova, por exemplo
 `--saida experimentos/resultados/analise_final/C4_revisao_02`. Consulte o relatório gerado
 para as hipóteses de gargalos, limitações de RSS, relógios e contadores de disco da VM.
+Os títulos dos gráficos, cenário e base na auditoria, capacidade de CPU e textos
+interpretativos refletem os dados selecionados. Os cálculos estatísticos seguem
+inalterados; descrições de tendências não presumem os resultados do C4.
 
 Para a recuperação isolada da falha C4/R2002, consulte
 [diagnóstico e procedimento de recuperação](docs/diagnostico_r2002.md).
+Para a falha de aquecimento C3/R3002, consulte o
+[diagnóstico da resolução temporal e recuperação R3012](docs/diagnostico_c3_r3002.md).
+Na validação de usuários, timestamps inteiros do histórico Locust identificam
+buckets de um segundo. Somente buckets inteiramente contidos na janela estável
+são comparados; os de fronteira ficam registrados em `validacao_historico` dos
+novos metadados. Eventos de instrumentação e divergências interiores continuam
+sendo verificados, inclusive zero usuários. Um snapshot de parada com segundo
+truncado não é tratado como prova de queda na janela estável.
+Snapshots com o mesmo timestamp não são eliminados nem reordenados: precisam
+de contadores acumulados válidos e consistentes na janela. Retrocessos temporais
+e regressões de contadores continuam sendo rejeitados; contadores estáveis são
+permitidos. Timestamps iguais não são usados para inventar duração. Consulte o
+[diagnóstico C1/R5001 e recuperação R5011](docs/diagnostico_c1_r5001.md).
 O executor automatizado fecha a entrada por pipe para desabilitar os atalhos do
 Locust, inclusive no Windows. Cada fase exige requisições, histórico com usuários
 planejados e marcos válidos; erros de encerramento no console invalidam a fase

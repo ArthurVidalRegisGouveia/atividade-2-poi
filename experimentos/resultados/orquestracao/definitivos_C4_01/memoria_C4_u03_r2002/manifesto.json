@@ -1,0 +1,2045 @@
+{
+  "job": {
+    "aplicacao": "memoria",
+    "cenario": "C4",
+    "usuarios": 3,
+    "repeticao": 2002,
+    "repeticao_logica": 2,
+    "tentativa": 1,
+    "caminho": "experimentos/resultados/carga/memoria/C4/usuarios_03/repeticao_2002",
+    "aquecimento_s": 30,
+    "medicao_configurada_s": 60,
+    "espera_s": 0,
+    "conexoes": "fechar",
+    "taxa": 3,
+    "parametros_http": {
+      "tamanho_mb": 50
+    }
+  },
+  "estado": "concluída",
+  "criado_utc": "2026-10-08T21:39:01.061412+00:00",
+  "manifesto": "D:\\atividade-2-poi\\experimentos\\resultados\\orquestracao\\definitivos_C4_01\\memoria_C4_u03_r2002\\manifesto.json",
+  "vm_nome_declarado": "POI-Ubuntu-Server",
+  "provisionamento_confirmado": null,
+  "comandos_planejados": {
+    "locust": [
+      "D:\\atividade-2-poi\\.venv\\Scripts\\python.exe",
+      "-B",
+      "D:\\atividade-2-poi\\scripts\\carga\\executar_locust.py",
+      "--aplicacao",
+      "memoria",
+      "--cenario",
+      "C4",
+      "--usuarios",
+      "3",
+      "--repeticao",
+      "2002",
+      "--taxa",
+      "3",
+      "--aquecimento",
+      "30",
+      "--duracao",
+      "60",
+      "--espera",
+      "0",
+      "--conexoes",
+      "fechar",
+      "--registrar-worker-pid",
+      "--verificacao-relogio",
+      "D:\\atividade-2-poi\\experimentos\\resultados\\orquestracao\\definitivos_C4_01\\memoria_C4_u03_r2002\\relogio_antes.json",
+      "--config-servidor",
+      "D:\\atividade-2-poi\\experimentos\\resultados\\orquestracao\\definitivos_C4_01\\memoria_C4_u03_r2002\\servidor_verificado.json",
+      "--tamanho-mb",
+      "50"
+    ]
+  },
+  "inicio_utc": "2026-10-08T22:44:23.092212+00:00",
+  "token_monitor": "647f5ed3-4c53-41ae-8aa4-5b149d33094c",
+  "comandos": [
+    {
+      "comando": [
+        "ssh",
+        "-o",
+        "BatchMode=yes",
+        "-o",
+        "ConnectTimeout=10",
+        "-p",
+        "2222",
+        "osboxes@127.0.0.1",
+        "/home/osboxes/atividade-2-poi/.venv/bin/python /home/osboxes/atividade-2-poi/scripts/experimentacao/agente_linux.py"
+      ],
+      "inicio_utc": "2026-10-08T22:44:23.763185+00:00",
+      "entrada_json": {
+        "acao": "auditar",
+        "aplicacoes": [
+          "memoria"
+        ]
+      },
+      "codigo_saida": 0,
+      "fim_utc": "2026-10-08T22:44:24.063679+00:00"
+    },
+    {
+      "comando": [
+        "D:\\atividade-2-poi\\.venv\\Scripts\\python.exe",
+        "-B",
+        "D:\\atividade-2-poi\\scripts\\monitoramento\\verificar_relogios.py",
+        "--url",
+        "http://127.0.0.1:8002",
+        "--saida",
+        "D:\\atividade-2-poi\\experimentos\\resultados\\orquestracao\\definitivos_C4_01\\memoria_C4_u03_r2002\\relogio_antes.json"
+      ],
+      "inicio_utc": "2026-10-08T22:44:24.078005+00:00",
+      "codigo_saida": 0,
+      "fim_utc": "2026-10-08T22:44:24.362215+00:00"
+    },
+    {
+      "comando": [
+        "ssh",
+        "-o",
+        "BatchMode=yes",
+        "-o",
+        "ConnectTimeout=10",
+        "-p",
+        "2222",
+        "osboxes@127.0.0.1",
+        "/home/osboxes/atividade-2-poi/.venv/bin/python /home/osboxes/atividade-2-poi/scripts/experimentacao/agente_linux.py"
+      ],
+      "inicio_utc": "2026-10-08T22:44:24.362266+00:00",
+      "entrada_json": {
+        "acao": "iniciar",
+        "token": "647f5ed3-4c53-41ae-8aa4-5b149d33094c",
+        "job": {
+          "aplicacao": "memoria",
+          "cenario": "C4",
+          "usuarios": 3,
+          "repeticao": 2002,
+          "repeticao_logica": 2,
+          "tentativa": 1,
+          "caminho": "experimentos/resultados/carga/memoria/C4/usuarios_03/repeticao_2002",
+          "aquecimento_s": 30,
+          "medicao_configurada_s": 60,
+          "espera_s": 0,
+          "conexoes": "fechar",
+          "taxa": 3,
+          "parametros_http": {
+            "tamanho_mb": 50
+          }
+        },
+        "pid": 1051,
+        "servidor_criado_epoch_s": 1791490686.26,
+        "duracao": 200
+      },
+      "codigo_saida": 0,
+      "fim_utc": "2026-10-08T22:44:24.661329+00:00"
+    },
+    {
+      "comando": [
+        "ssh",
+        "-o",
+        "BatchMode=yes",
+        "-o",
+        "ConnectTimeout=10",
+        "-p",
+        "2222",
+        "osboxes@127.0.0.1",
+        "/home/osboxes/atividade-2-poi/.venv/bin/python /home/osboxes/atividade-2-poi/scripts/experimentacao/agente_linux.py"
+      ],
+      "inicio_utc": "2026-10-08T22:44:24.661393+00:00",
+      "entrada_json": {
+        "acao": "estado",
+        "token": "647f5ed3-4c53-41ae-8aa4-5b149d33094c"
+      },
+      "codigo_saida": 0,
+      "fim_utc": "2026-10-08T22:44:24.939895+00:00"
+    },
+    {
+      "comando": [
+        "ssh",
+        "-o",
+        "BatchMode=yes",
+        "-o",
+        "ConnectTimeout=10",
+        "-p",
+        "2222",
+        "osboxes@127.0.0.1",
+        "/home/osboxes/atividade-2-poi/.venv/bin/python /home/osboxes/atividade-2-poi/scripts/experimentacao/agente_linux.py"
+      ],
+      "inicio_utc": "2026-10-08T22:44:25.940542+00:00",
+      "entrada_json": {
+        "acao": "estado",
+        "token": "647f5ed3-4c53-41ae-8aa4-5b149d33094c"
+      },
+      "codigo_saida": 0,
+      "fim_utc": "2026-10-08T22:44:26.232565+00:00"
+    },
+    {
+      "comando": [
+        "D:\\atividade-2-poi\\.venv\\Scripts\\python.exe",
+        "-B",
+        "D:\\atividade-2-poi\\scripts\\carga\\executar_locust.py",
+        "--aplicacao",
+        "memoria",
+        "--cenario",
+        "C4",
+        "--usuarios",
+        "3",
+        "--repeticao",
+        "2002",
+        "--taxa",
+        "3",
+        "--aquecimento",
+        "30",
+        "--duracao",
+        "60",
+        "--espera",
+        "0",
+        "--conexoes",
+        "fechar",
+        "--registrar-worker-pid",
+        "--verificacao-relogio",
+        "D:\\atividade-2-poi\\experimentos\\resultados\\orquestracao\\definitivos_C4_01\\memoria_C4_u03_r2002\\relogio_antes.json",
+        "--config-servidor",
+        "D:\\atividade-2-poi\\experimentos\\resultados\\orquestracao\\definitivos_C4_01\\memoria_C4_u03_r2002\\servidor_verificado.json",
+        "--tamanho-mb",
+        "50"
+      ],
+      "inicio_utc": "2026-10-08T22:44:26.232673+00:00",
+      "codigo_saida": 0,
+      "fim_utc": "2026-10-08T22:45:59.021786+00:00"
+    },
+    {
+      "comando": [
+        "D:\\atividade-2-poi\\.venv\\Scripts\\python.exe",
+        "-B",
+        "D:\\atividade-2-poi\\scripts\\monitoramento\\verificar_relogios.py",
+        "--url",
+        "http://127.0.0.1:8002",
+        "--saida",
+        "D:\\atividade-2-poi\\experimentos\\resultados\\orquestracao\\definitivos_C4_01\\memoria_C4_u03_r2002\\relogio_depois.json"
+      ],
+      "inicio_utc": "2026-10-08T22:45:59.021991+00:00",
+      "codigo_saida": 0,
+      "fim_utc": "2026-10-08T22:45:59.273164+00:00"
+    },
+    {
+      "comando": [
+        "ssh",
+        "-o",
+        "BatchMode=yes",
+        "-o",
+        "ConnectTimeout=10",
+        "-p",
+        "2222",
+        "osboxes@127.0.0.1",
+        "/home/osboxes/atividade-2-poi/.venv/bin/python /home/osboxes/atividade-2-poi/scripts/experimentacao/agente_linux.py"
+      ],
+      "inicio_utc": "2026-10-08T22:45:59.273204+00:00",
+      "entrada_json": {
+        "acao": "estado",
+        "token": "647f5ed3-4c53-41ae-8aa4-5b149d33094c"
+      },
+      "codigo_saida": 0,
+      "fim_utc": "2026-10-08T22:45:59.838281+00:00"
+    },
+    {
+      "comando": [
+        "ssh",
+        "-o",
+        "BatchMode=yes",
+        "-o",
+        "ConnectTimeout=10",
+        "-p",
+        "2222",
+        "osboxes@127.0.0.1",
+        "/home/osboxes/atividade-2-poi/.venv/bin/python /home/osboxes/atividade-2-poi/scripts/experimentacao/agente_linux.py"
+      ],
+      "inicio_utc": "2026-10-08T22:46:00.838538+00:00",
+      "entrada_json": {
+        "acao": "estado",
+        "token": "647f5ed3-4c53-41ae-8aa4-5b149d33094c"
+      },
+      "codigo_saida": 0,
+      "fim_utc": "2026-10-08T22:46:01.152595+00:00"
+    },
+    {
+      "comando": [
+        "ssh",
+        "-o",
+        "BatchMode=yes",
+        "-o",
+        "ConnectTimeout=10",
+        "-p",
+        "2222",
+        "osboxes@127.0.0.1",
+        "/home/osboxes/atividade-2-poi/.venv/bin/python /home/osboxes/atividade-2-poi/scripts/experimentacao/agente_linux.py"
+      ],
+      "inicio_utc": "2026-10-08T22:46:02.153048+00:00",
+      "entrada_json": {
+        "acao": "estado",
+        "token": "647f5ed3-4c53-41ae-8aa4-5b149d33094c"
+      },
+      "codigo_saida": 0,
+      "fim_utc": "2026-10-08T22:46:02.435363+00:00"
+    },
+    {
+      "comando": [
+        "ssh",
+        "-o",
+        "BatchMode=yes",
+        "-o",
+        "ConnectTimeout=10",
+        "-p",
+        "2222",
+        "osboxes@127.0.0.1",
+        "/home/osboxes/atividade-2-poi/.venv/bin/python /home/osboxes/atividade-2-poi/scripts/experimentacao/agente_linux.py"
+      ],
+      "inicio_utc": "2026-10-08T22:46:03.436011+00:00",
+      "entrada_json": {
+        "acao": "estado",
+        "token": "647f5ed3-4c53-41ae-8aa4-5b149d33094c"
+      },
+      "codigo_saida": 0,
+      "fim_utc": "2026-10-08T22:46:03.734788+00:00"
+    },
+    {
+      "comando": [
+        "ssh",
+        "-o",
+        "BatchMode=yes",
+        "-o",
+        "ConnectTimeout=10",
+        "-p",
+        "2222",
+        "osboxes@127.0.0.1",
+        "/home/osboxes/atividade-2-poi/.venv/bin/python /home/osboxes/atividade-2-poi/scripts/experimentacao/agente_linux.py"
+      ],
+      "inicio_utc": "2026-10-08T22:46:04.735048+00:00",
+      "entrada_json": {
+        "acao": "estado",
+        "token": "647f5ed3-4c53-41ae-8aa4-5b149d33094c"
+      },
+      "codigo_saida": 0,
+      "fim_utc": "2026-10-08T22:46:05.019537+00:00"
+    },
+    {
+      "comando": [
+        "ssh",
+        "-o",
+        "BatchMode=yes",
+        "-o",
+        "ConnectTimeout=10",
+        "-p",
+        "2222",
+        "osboxes@127.0.0.1",
+        "/home/osboxes/atividade-2-poi/.venv/bin/python /home/osboxes/atividade-2-poi/scripts/experimentacao/agente_linux.py"
+      ],
+      "inicio_utc": "2026-10-08T22:46:06.020254+00:00",
+      "entrada_json": {
+        "acao": "estado",
+        "token": "647f5ed3-4c53-41ae-8aa4-5b149d33094c"
+      },
+      "codigo_saida": 0,
+      "fim_utc": "2026-10-08T22:46:06.310533+00:00"
+    },
+    {
+      "comando": [
+        "ssh",
+        "-o",
+        "BatchMode=yes",
+        "-o",
+        "ConnectTimeout=10",
+        "-p",
+        "2222",
+        "osboxes@127.0.0.1",
+        "/home/osboxes/atividade-2-poi/.venv/bin/python /home/osboxes/atividade-2-poi/scripts/experimentacao/agente_linux.py"
+      ],
+      "inicio_utc": "2026-10-08T22:46:07.311064+00:00",
+      "entrada_json": {
+        "acao": "estado",
+        "token": "647f5ed3-4c53-41ae-8aa4-5b149d33094c"
+      },
+      "codigo_saida": 0,
+      "fim_utc": "2026-10-08T22:46:07.600665+00:00"
+    },
+    {
+      "comando": [
+        "ssh",
+        "-o",
+        "BatchMode=yes",
+        "-o",
+        "ConnectTimeout=10",
+        "-p",
+        "2222",
+        "osboxes@127.0.0.1",
+        "/home/osboxes/atividade-2-poi/.venv/bin/python /home/osboxes/atividade-2-poi/scripts/experimentacao/agente_linux.py"
+      ],
+      "inicio_utc": "2026-10-08T22:46:08.601343+00:00",
+      "entrada_json": {
+        "acao": "estado",
+        "token": "647f5ed3-4c53-41ae-8aa4-5b149d33094c"
+      },
+      "codigo_saida": 0,
+      "fim_utc": "2026-10-08T22:46:08.896041+00:00"
+    },
+    {
+      "comando": [
+        "ssh",
+        "-o",
+        "BatchMode=yes",
+        "-o",
+        "ConnectTimeout=10",
+        "-p",
+        "2222",
+        "osboxes@127.0.0.1",
+        "/home/osboxes/atividade-2-poi/.venv/bin/python /home/osboxes/atividade-2-poi/scripts/experimentacao/agente_linux.py"
+      ],
+      "inicio_utc": "2026-10-08T22:46:09.896557+00:00",
+      "entrada_json": {
+        "acao": "estado",
+        "token": "647f5ed3-4c53-41ae-8aa4-5b149d33094c"
+      },
+      "codigo_saida": 0,
+      "fim_utc": "2026-10-08T22:46:10.189228+00:00"
+    },
+    {
+      "comando": [
+        "ssh",
+        "-o",
+        "BatchMode=yes",
+        "-o",
+        "ConnectTimeout=10",
+        "-p",
+        "2222",
+        "osboxes@127.0.0.1",
+        "/home/osboxes/atividade-2-poi/.venv/bin/python /home/osboxes/atividade-2-poi/scripts/experimentacao/agente_linux.py"
+      ],
+      "inicio_utc": "2026-10-08T22:46:11.189507+00:00",
+      "entrada_json": {
+        "acao": "estado",
+        "token": "647f5ed3-4c53-41ae-8aa4-5b149d33094c"
+      },
+      "codigo_saida": 0,
+      "fim_utc": "2026-10-08T22:46:11.465460+00:00"
+    },
+    {
+      "comando": [
+        "ssh",
+        "-o",
+        "BatchMode=yes",
+        "-o",
+        "ConnectTimeout=10",
+        "-p",
+        "2222",
+        "osboxes@127.0.0.1",
+        "/home/osboxes/atividade-2-poi/.venv/bin/python /home/osboxes/atividade-2-poi/scripts/experimentacao/agente_linux.py"
+      ],
+      "inicio_utc": "2026-10-08T22:46:12.465915+00:00",
+      "entrada_json": {
+        "acao": "estado",
+        "token": "647f5ed3-4c53-41ae-8aa4-5b149d33094c"
+      },
+      "codigo_saida": 0,
+      "fim_utc": "2026-10-08T22:46:12.757217+00:00"
+    },
+    {
+      "comando": [
+        "ssh",
+        "-o",
+        "BatchMode=yes",
+        "-o",
+        "ConnectTimeout=10",
+        "-p",
+        "2222",
+        "osboxes@127.0.0.1",
+        "/home/osboxes/atividade-2-poi/.venv/bin/python /home/osboxes/atividade-2-poi/scripts/experimentacao/agente_linux.py"
+      ],
+      "inicio_utc": "2026-10-08T22:46:13.757487+00:00",
+      "entrada_json": {
+        "acao": "estado",
+        "token": "647f5ed3-4c53-41ae-8aa4-5b149d33094c"
+      },
+      "codigo_saida": 0,
+      "fim_utc": "2026-10-08T22:46:14.045647+00:00"
+    },
+    {
+      "comando": [
+        "ssh",
+        "-o",
+        "BatchMode=yes",
+        "-o",
+        "ConnectTimeout=10",
+        "-p",
+        "2222",
+        "osboxes@127.0.0.1",
+        "/home/osboxes/atividade-2-poi/.venv/bin/python /home/osboxes/atividade-2-poi/scripts/experimentacao/agente_linux.py"
+      ],
+      "inicio_utc": "2026-10-08T22:46:15.046204+00:00",
+      "entrada_json": {
+        "acao": "estado",
+        "token": "647f5ed3-4c53-41ae-8aa4-5b149d33094c"
+      },
+      "codigo_saida": 0,
+      "fim_utc": "2026-10-08T22:46:15.331299+00:00"
+    },
+    {
+      "comando": [
+        "ssh",
+        "-o",
+        "BatchMode=yes",
+        "-o",
+        "ConnectTimeout=10",
+        "-p",
+        "2222",
+        "osboxes@127.0.0.1",
+        "/home/osboxes/atividade-2-poi/.venv/bin/python /home/osboxes/atividade-2-poi/scripts/experimentacao/agente_linux.py"
+      ],
+      "inicio_utc": "2026-10-08T22:46:16.331656+00:00",
+      "entrada_json": {
+        "acao": "estado",
+        "token": "647f5ed3-4c53-41ae-8aa4-5b149d33094c"
+      },
+      "codigo_saida": 0,
+      "fim_utc": "2026-10-08T22:46:16.657265+00:00"
+    },
+    {
+      "comando": [
+        "ssh",
+        "-o",
+        "BatchMode=yes",
+        "-o",
+        "ConnectTimeout=10",
+        "-p",
+        "2222",
+        "osboxes@127.0.0.1",
+        "/home/osboxes/atividade-2-poi/.venv/bin/python /home/osboxes/atividade-2-poi/scripts/experimentacao/agente_linux.py"
+      ],
+      "inicio_utc": "2026-10-08T22:46:17.657629+00:00",
+      "entrada_json": {
+        "acao": "estado",
+        "token": "647f5ed3-4c53-41ae-8aa4-5b149d33094c"
+      },
+      "codigo_saida": 0,
+      "fim_utc": "2026-10-08T22:46:17.941357+00:00"
+    },
+    {
+      "comando": [
+        "ssh",
+        "-o",
+        "BatchMode=yes",
+        "-o",
+        "ConnectTimeout=10",
+        "-p",
+        "2222",
+        "osboxes@127.0.0.1",
+        "/home/osboxes/atividade-2-poi/.venv/bin/python /home/osboxes/atividade-2-poi/scripts/experimentacao/agente_linux.py"
+      ],
+      "inicio_utc": "2026-10-08T22:46:18.941664+00:00",
+      "entrada_json": {
+        "acao": "estado",
+        "token": "647f5ed3-4c53-41ae-8aa4-5b149d33094c"
+      },
+      "codigo_saida": 0,
+      "fim_utc": "2026-10-08T22:46:19.230325+00:00"
+    },
+    {
+      "comando": [
+        "ssh",
+        "-o",
+        "BatchMode=yes",
+        "-o",
+        "ConnectTimeout=10",
+        "-p",
+        "2222",
+        "osboxes@127.0.0.1",
+        "/home/osboxes/atividade-2-poi/.venv/bin/python /home/osboxes/atividade-2-poi/scripts/experimentacao/agente_linux.py"
+      ],
+      "inicio_utc": "2026-10-08T22:46:20.230949+00:00",
+      "entrada_json": {
+        "acao": "estado",
+        "token": "647f5ed3-4c53-41ae-8aa4-5b149d33094c"
+      },
+      "codigo_saida": 0,
+      "fim_utc": "2026-10-08T22:46:20.529846+00:00"
+    },
+    {
+      "comando": [
+        "ssh",
+        "-o",
+        "BatchMode=yes",
+        "-o",
+        "ConnectTimeout=10",
+        "-p",
+        "2222",
+        "osboxes@127.0.0.1",
+        "/home/osboxes/atividade-2-poi/.venv/bin/python /home/osboxes/atividade-2-poi/scripts/experimentacao/agente_linux.py"
+      ],
+      "inicio_utc": "2026-10-08T22:46:21.530513+00:00",
+      "entrada_json": {
+        "acao": "estado",
+        "token": "647f5ed3-4c53-41ae-8aa4-5b149d33094c"
+      },
+      "codigo_saida": 0,
+      "fim_utc": "2026-10-08T22:46:21.817696+00:00"
+    },
+    {
+      "comando": [
+        "ssh",
+        "-o",
+        "BatchMode=yes",
+        "-o",
+        "ConnectTimeout=10",
+        "-p",
+        "2222",
+        "osboxes@127.0.0.1",
+        "/home/osboxes/atividade-2-poi/.venv/bin/python /home/osboxes/atividade-2-poi/scripts/experimentacao/agente_linux.py"
+      ],
+      "inicio_utc": "2026-10-08T22:46:22.817995+00:00",
+      "entrada_json": {
+        "acao": "estado",
+        "token": "647f5ed3-4c53-41ae-8aa4-5b149d33094c"
+      },
+      "codigo_saida": 0,
+      "fim_utc": "2026-10-08T22:46:23.109061+00:00"
+    },
+    {
+      "comando": [
+        "ssh",
+        "-o",
+        "BatchMode=yes",
+        "-o",
+        "ConnectTimeout=10",
+        "-p",
+        "2222",
+        "osboxes@127.0.0.1",
+        "/home/osboxes/atividade-2-poi/.venv/bin/python /home/osboxes/atividade-2-poi/scripts/experimentacao/agente_linux.py"
+      ],
+      "inicio_utc": "2026-10-08T22:46:24.109765+00:00",
+      "entrada_json": {
+        "acao": "estado",
+        "token": "647f5ed3-4c53-41ae-8aa4-5b149d33094c"
+      },
+      "codigo_saida": 0,
+      "fim_utc": "2026-10-08T22:46:24.388626+00:00"
+    },
+    {
+      "comando": [
+        "ssh",
+        "-o",
+        "BatchMode=yes",
+        "-o",
+        "ConnectTimeout=10",
+        "-p",
+        "2222",
+        "osboxes@127.0.0.1",
+        "/home/osboxes/atividade-2-poi/.venv/bin/python /home/osboxes/atividade-2-poi/scripts/experimentacao/agente_linux.py"
+      ],
+      "inicio_utc": "2026-10-08T22:46:25.389173+00:00",
+      "entrada_json": {
+        "acao": "estado",
+        "token": "647f5ed3-4c53-41ae-8aa4-5b149d33094c"
+      },
+      "codigo_saida": 0,
+      "fim_utc": "2026-10-08T22:46:25.675669+00:00"
+    },
+    {
+      "comando": [
+        "ssh",
+        "-o",
+        "BatchMode=yes",
+        "-o",
+        "ConnectTimeout=10",
+        "-p",
+        "2222",
+        "osboxes@127.0.0.1",
+        "/home/osboxes/atividade-2-poi/.venv/bin/python /home/osboxes/atividade-2-poi/scripts/experimentacao/agente_linux.py"
+      ],
+      "inicio_utc": "2026-10-08T22:46:26.676052+00:00",
+      "entrada_json": {
+        "acao": "estado",
+        "token": "647f5ed3-4c53-41ae-8aa4-5b149d33094c"
+      },
+      "codigo_saida": 0,
+      "fim_utc": "2026-10-08T22:46:26.970359+00:00"
+    },
+    {
+      "comando": [
+        "ssh",
+        "-o",
+        "BatchMode=yes",
+        "-o",
+        "ConnectTimeout=10",
+        "-p",
+        "2222",
+        "osboxes@127.0.0.1",
+        "/home/osboxes/atividade-2-poi/.venv/bin/python /home/osboxes/atividade-2-poi/scripts/experimentacao/agente_linux.py"
+      ],
+      "inicio_utc": "2026-10-08T22:46:27.970655+00:00",
+      "entrada_json": {
+        "acao": "estado",
+        "token": "647f5ed3-4c53-41ae-8aa4-5b149d33094c"
+      },
+      "codigo_saida": 0,
+      "fim_utc": "2026-10-08T22:46:28.255448+00:00"
+    },
+    {
+      "comando": [
+        "ssh",
+        "-o",
+        "BatchMode=yes",
+        "-o",
+        "ConnectTimeout=10",
+        "-p",
+        "2222",
+        "osboxes@127.0.0.1",
+        "/home/osboxes/atividade-2-poi/.venv/bin/python /home/osboxes/atividade-2-poi/scripts/experimentacao/agente_linux.py"
+      ],
+      "inicio_utc": "2026-10-08T22:46:29.255925+00:00",
+      "entrada_json": {
+        "acao": "estado",
+        "token": "647f5ed3-4c53-41ae-8aa4-5b149d33094c"
+      },
+      "codigo_saida": 0,
+      "fim_utc": "2026-10-08T22:46:29.550391+00:00"
+    },
+    {
+      "comando": [
+        "ssh",
+        "-o",
+        "BatchMode=yes",
+        "-o",
+        "ConnectTimeout=10",
+        "-p",
+        "2222",
+        "osboxes@127.0.0.1",
+        "/home/osboxes/atividade-2-poi/.venv/bin/python /home/osboxes/atividade-2-poi/scripts/experimentacao/agente_linux.py"
+      ],
+      "inicio_utc": "2026-10-08T22:46:30.550780+00:00",
+      "entrada_json": {
+        "acao": "estado",
+        "token": "647f5ed3-4c53-41ae-8aa4-5b149d33094c"
+      },
+      "codigo_saida": 0,
+      "fim_utc": "2026-10-08T22:46:30.848241+00:00"
+    },
+    {
+      "comando": [
+        "ssh",
+        "-o",
+        "BatchMode=yes",
+        "-o",
+        "ConnectTimeout=10",
+        "-p",
+        "2222",
+        "osboxes@127.0.0.1",
+        "/home/osboxes/atividade-2-poi/.venv/bin/python /home/osboxes/atividade-2-poi/scripts/experimentacao/agente_linux.py"
+      ],
+      "inicio_utc": "2026-10-08T22:46:31.848579+00:00",
+      "entrada_json": {
+        "acao": "estado",
+        "token": "647f5ed3-4c53-41ae-8aa4-5b149d33094c"
+      },
+      "codigo_saida": 0,
+      "fim_utc": "2026-10-08T22:46:32.139301+00:00"
+    },
+    {
+      "comando": [
+        "ssh",
+        "-o",
+        "BatchMode=yes",
+        "-o",
+        "ConnectTimeout=10",
+        "-p",
+        "2222",
+        "osboxes@127.0.0.1",
+        "/home/osboxes/atividade-2-poi/.venv/bin/python /home/osboxes/atividade-2-poi/scripts/experimentacao/agente_linux.py"
+      ],
+      "inicio_utc": "2026-10-08T22:46:33.139672+00:00",
+      "entrada_json": {
+        "acao": "estado",
+        "token": "647f5ed3-4c53-41ae-8aa4-5b149d33094c"
+      },
+      "codigo_saida": 0,
+      "fim_utc": "2026-10-08T22:46:33.426622+00:00"
+    },
+    {
+      "comando": [
+        "ssh",
+        "-o",
+        "BatchMode=yes",
+        "-o",
+        "ConnectTimeout=10",
+        "-p",
+        "2222",
+        "osboxes@127.0.0.1",
+        "/home/osboxes/atividade-2-poi/.venv/bin/python /home/osboxes/atividade-2-poi/scripts/experimentacao/agente_linux.py"
+      ],
+      "inicio_utc": "2026-10-08T22:46:34.426871+00:00",
+      "entrada_json": {
+        "acao": "estado",
+        "token": "647f5ed3-4c53-41ae-8aa4-5b149d33094c"
+      },
+      "codigo_saida": 0,
+      "fim_utc": "2026-10-08T22:46:34.709378+00:00"
+    },
+    {
+      "comando": [
+        "ssh",
+        "-o",
+        "BatchMode=yes",
+        "-o",
+        "ConnectTimeout=10",
+        "-p",
+        "2222",
+        "osboxes@127.0.0.1",
+        "/home/osboxes/atividade-2-poi/.venv/bin/python /home/osboxes/atividade-2-poi/scripts/experimentacao/agente_linux.py"
+      ],
+      "inicio_utc": "2026-10-08T22:46:35.709792+00:00",
+      "entrada_json": {
+        "acao": "estado",
+        "token": "647f5ed3-4c53-41ae-8aa4-5b149d33094c"
+      },
+      "codigo_saida": 0,
+      "fim_utc": "2026-10-08T22:46:35.996249+00:00"
+    },
+    {
+      "comando": [
+        "ssh",
+        "-o",
+        "BatchMode=yes",
+        "-o",
+        "ConnectTimeout=10",
+        "-p",
+        "2222",
+        "osboxes@127.0.0.1",
+        "/home/osboxes/atividade-2-poi/.venv/bin/python /home/osboxes/atividade-2-poi/scripts/experimentacao/agente_linux.py"
+      ],
+      "inicio_utc": "2026-10-08T22:46:36.996863+00:00",
+      "entrada_json": {
+        "acao": "estado",
+        "token": "647f5ed3-4c53-41ae-8aa4-5b149d33094c"
+      },
+      "codigo_saida": 0,
+      "fim_utc": "2026-10-08T22:46:37.287169+00:00"
+    },
+    {
+      "comando": [
+        "ssh",
+        "-o",
+        "BatchMode=yes",
+        "-o",
+        "ConnectTimeout=10",
+        "-p",
+        "2222",
+        "osboxes@127.0.0.1",
+        "/home/osboxes/atividade-2-poi/.venv/bin/python /home/osboxes/atividade-2-poi/scripts/experimentacao/agente_linux.py"
+      ],
+      "inicio_utc": "2026-10-08T22:46:38.287692+00:00",
+      "entrada_json": {
+        "acao": "estado",
+        "token": "647f5ed3-4c53-41ae-8aa4-5b149d33094c"
+      },
+      "codigo_saida": 0,
+      "fim_utc": "2026-10-08T22:46:38.577039+00:00"
+    },
+    {
+      "comando": [
+        "ssh",
+        "-o",
+        "BatchMode=yes",
+        "-o",
+        "ConnectTimeout=10",
+        "-p",
+        "2222",
+        "osboxes@127.0.0.1",
+        "/home/osboxes/atividade-2-poi/.venv/bin/python /home/osboxes/atividade-2-poi/scripts/experimentacao/agente_linux.py"
+      ],
+      "inicio_utc": "2026-10-08T22:46:39.577556+00:00",
+      "entrada_json": {
+        "acao": "estado",
+        "token": "647f5ed3-4c53-41ae-8aa4-5b149d33094c"
+      },
+      "codigo_saida": 0,
+      "fim_utc": "2026-10-08T22:46:39.869778+00:00"
+    },
+    {
+      "comando": [
+        "ssh",
+        "-o",
+        "BatchMode=yes",
+        "-o",
+        "ConnectTimeout=10",
+        "-p",
+        "2222",
+        "osboxes@127.0.0.1",
+        "/home/osboxes/atividade-2-poi/.venv/bin/python /home/osboxes/atividade-2-poi/scripts/experimentacao/agente_linux.py"
+      ],
+      "inicio_utc": "2026-10-08T22:46:40.870204+00:00",
+      "entrada_json": {
+        "acao": "estado",
+        "token": "647f5ed3-4c53-41ae-8aa4-5b149d33094c"
+      },
+      "codigo_saida": 0,
+      "fim_utc": "2026-10-08T22:46:41.162112+00:00"
+    },
+    {
+      "comando": [
+        "ssh",
+        "-o",
+        "BatchMode=yes",
+        "-o",
+        "ConnectTimeout=10",
+        "-p",
+        "2222",
+        "osboxes@127.0.0.1",
+        "/home/osboxes/atividade-2-poi/.venv/bin/python /home/osboxes/atividade-2-poi/scripts/experimentacao/agente_linux.py"
+      ],
+      "inicio_utc": "2026-10-08T22:46:42.162536+00:00",
+      "entrada_json": {
+        "acao": "estado",
+        "token": "647f5ed3-4c53-41ae-8aa4-5b149d33094c"
+      },
+      "codigo_saida": 0,
+      "fim_utc": "2026-10-08T22:46:42.514340+00:00"
+    },
+    {
+      "comando": [
+        "ssh",
+        "-o",
+        "BatchMode=yes",
+        "-o",
+        "ConnectTimeout=10",
+        "-p",
+        "2222",
+        "osboxes@127.0.0.1",
+        "/home/osboxes/atividade-2-poi/.venv/bin/python /home/osboxes/atividade-2-poi/scripts/experimentacao/agente_linux.py"
+      ],
+      "inicio_utc": "2026-10-08T22:46:43.514556+00:00",
+      "entrada_json": {
+        "acao": "estado",
+        "token": "647f5ed3-4c53-41ae-8aa4-5b149d33094c"
+      },
+      "codigo_saida": 0,
+      "fim_utc": "2026-10-08T22:46:43.810797+00:00"
+    },
+    {
+      "comando": [
+        "ssh",
+        "-o",
+        "BatchMode=yes",
+        "-o",
+        "ConnectTimeout=10",
+        "-p",
+        "2222",
+        "osboxes@127.0.0.1",
+        "/home/osboxes/atividade-2-poi/.venv/bin/python /home/osboxes/atividade-2-poi/scripts/experimentacao/agente_linux.py"
+      ],
+      "inicio_utc": "2026-10-08T22:46:44.811353+00:00",
+      "entrada_json": {
+        "acao": "estado",
+        "token": "647f5ed3-4c53-41ae-8aa4-5b149d33094c"
+      },
+      "codigo_saida": 0,
+      "fim_utc": "2026-10-08T22:46:45.098836+00:00"
+    },
+    {
+      "comando": [
+        "ssh",
+        "-o",
+        "BatchMode=yes",
+        "-o",
+        "ConnectTimeout=10",
+        "-p",
+        "2222",
+        "osboxes@127.0.0.1",
+        "/home/osboxes/atividade-2-poi/.venv/bin/python /home/osboxes/atividade-2-poi/scripts/experimentacao/agente_linux.py"
+      ],
+      "inicio_utc": "2026-10-08T22:46:46.099428+00:00",
+      "entrada_json": {
+        "acao": "estado",
+        "token": "647f5ed3-4c53-41ae-8aa4-5b149d33094c"
+      },
+      "codigo_saida": 0,
+      "fim_utc": "2026-10-08T22:46:46.384915+00:00"
+    },
+    {
+      "comando": [
+        "ssh",
+        "-o",
+        "BatchMode=yes",
+        "-o",
+        "ConnectTimeout=10",
+        "-p",
+        "2222",
+        "osboxes@127.0.0.1",
+        "/home/osboxes/atividade-2-poi/.venv/bin/python /home/osboxes/atividade-2-poi/scripts/experimentacao/agente_linux.py"
+      ],
+      "inicio_utc": "2026-10-08T22:46:47.385250+00:00",
+      "entrada_json": {
+        "acao": "estado",
+        "token": "647f5ed3-4c53-41ae-8aa4-5b149d33094c"
+      },
+      "codigo_saida": 0,
+      "fim_utc": "2026-10-08T22:46:47.698797+00:00"
+    },
+    {
+      "comando": [
+        "ssh",
+        "-o",
+        "BatchMode=yes",
+        "-o",
+        "ConnectTimeout=10",
+        "-p",
+        "2222",
+        "osboxes@127.0.0.1",
+        "/home/osboxes/atividade-2-poi/.venv/bin/python /home/osboxes/atividade-2-poi/scripts/experimentacao/agente_linux.py"
+      ],
+      "inicio_utc": "2026-10-08T22:46:48.699306+00:00",
+      "entrada_json": {
+        "acao": "estado",
+        "token": "647f5ed3-4c53-41ae-8aa4-5b149d33094c"
+      },
+      "codigo_saida": 0,
+      "fim_utc": "2026-10-08T22:46:48.987497+00:00"
+    },
+    {
+      "comando": [
+        "ssh",
+        "-o",
+        "BatchMode=yes",
+        "-o",
+        "ConnectTimeout=10",
+        "-p",
+        "2222",
+        "osboxes@127.0.0.1",
+        "/home/osboxes/atividade-2-poi/.venv/bin/python /home/osboxes/atividade-2-poi/scripts/experimentacao/agente_linux.py"
+      ],
+      "inicio_utc": "2026-10-08T22:46:49.987891+00:00",
+      "entrada_json": {
+        "acao": "estado",
+        "token": "647f5ed3-4c53-41ae-8aa4-5b149d33094c"
+      },
+      "codigo_saida": 0,
+      "fim_utc": "2026-10-08T22:46:50.266804+00:00"
+    },
+    {
+      "comando": [
+        "ssh",
+        "-o",
+        "BatchMode=yes",
+        "-o",
+        "ConnectTimeout=10",
+        "-p",
+        "2222",
+        "osboxes@127.0.0.1",
+        "/home/osboxes/atividade-2-poi/.venv/bin/python /home/osboxes/atividade-2-poi/scripts/experimentacao/agente_linux.py"
+      ],
+      "inicio_utc": "2026-10-08T22:46:51.267195+00:00",
+      "entrada_json": {
+        "acao": "estado",
+        "token": "647f5ed3-4c53-41ae-8aa4-5b149d33094c"
+      },
+      "codigo_saida": 0,
+      "fim_utc": "2026-10-08T22:46:51.554031+00:00"
+    },
+    {
+      "comando": [
+        "ssh",
+        "-o",
+        "BatchMode=yes",
+        "-o",
+        "ConnectTimeout=10",
+        "-p",
+        "2222",
+        "osboxes@127.0.0.1",
+        "/home/osboxes/atividade-2-poi/.venv/bin/python /home/osboxes/atividade-2-poi/scripts/experimentacao/agente_linux.py"
+      ],
+      "inicio_utc": "2026-10-08T22:46:52.554683+00:00",
+      "entrada_json": {
+        "acao": "estado",
+        "token": "647f5ed3-4c53-41ae-8aa4-5b149d33094c"
+      },
+      "codigo_saida": 0,
+      "fim_utc": "2026-10-08T22:46:52.841562+00:00"
+    },
+    {
+      "comando": [
+        "ssh",
+        "-o",
+        "BatchMode=yes",
+        "-o",
+        "ConnectTimeout=10",
+        "-p",
+        "2222",
+        "osboxes@127.0.0.1",
+        "/home/osboxes/atividade-2-poi/.venv/bin/python /home/osboxes/atividade-2-poi/scripts/experimentacao/agente_linux.py"
+      ],
+      "inicio_utc": "2026-10-08T22:46:53.842311+00:00",
+      "entrada_json": {
+        "acao": "estado",
+        "token": "647f5ed3-4c53-41ae-8aa4-5b149d33094c"
+      },
+      "codigo_saida": 0,
+      "fim_utc": "2026-10-08T22:46:54.126309+00:00"
+    },
+    {
+      "comando": [
+        "ssh",
+        "-o",
+        "BatchMode=yes",
+        "-o",
+        "ConnectTimeout=10",
+        "-p",
+        "2222",
+        "osboxes@127.0.0.1",
+        "/home/osboxes/atividade-2-poi/.venv/bin/python /home/osboxes/atividade-2-poi/scripts/experimentacao/agente_linux.py"
+      ],
+      "inicio_utc": "2026-10-08T22:46:55.126684+00:00",
+      "entrada_json": {
+        "acao": "estado",
+        "token": "647f5ed3-4c53-41ae-8aa4-5b149d33094c"
+      },
+      "codigo_saida": 0,
+      "fim_utc": "2026-10-08T22:46:55.417123+00:00"
+    },
+    {
+      "comando": [
+        "ssh",
+        "-o",
+        "BatchMode=yes",
+        "-o",
+        "ConnectTimeout=10",
+        "-p",
+        "2222",
+        "osboxes@127.0.0.1",
+        "/home/osboxes/atividade-2-poi/.venv/bin/python /home/osboxes/atividade-2-poi/scripts/experimentacao/agente_linux.py"
+      ],
+      "inicio_utc": "2026-10-08T22:46:56.417490+00:00",
+      "entrada_json": {
+        "acao": "estado",
+        "token": "647f5ed3-4c53-41ae-8aa4-5b149d33094c"
+      },
+      "codigo_saida": 0,
+      "fim_utc": "2026-10-08T22:46:56.715684+00:00"
+    },
+    {
+      "comando": [
+        "ssh",
+        "-o",
+        "BatchMode=yes",
+        "-o",
+        "ConnectTimeout=10",
+        "-p",
+        "2222",
+        "osboxes@127.0.0.1",
+        "/home/osboxes/atividade-2-poi/.venv/bin/python /home/osboxes/atividade-2-poi/scripts/experimentacao/agente_linux.py"
+      ],
+      "inicio_utc": "2026-10-08T22:46:57.716253+00:00",
+      "entrada_json": {
+        "acao": "estado",
+        "token": "647f5ed3-4c53-41ae-8aa4-5b149d33094c"
+      },
+      "codigo_saida": 0,
+      "fim_utc": "2026-10-08T22:46:57.996284+00:00"
+    },
+    {
+      "comando": [
+        "ssh",
+        "-o",
+        "BatchMode=yes",
+        "-o",
+        "ConnectTimeout=10",
+        "-p",
+        "2222",
+        "osboxes@127.0.0.1",
+        "/home/osboxes/atividade-2-poi/.venv/bin/python /home/osboxes/atividade-2-poi/scripts/experimentacao/agente_linux.py"
+      ],
+      "inicio_utc": "2026-10-08T22:46:58.996645+00:00",
+      "entrada_json": {
+        "acao": "estado",
+        "token": "647f5ed3-4c53-41ae-8aa4-5b149d33094c"
+      },
+      "codigo_saida": 0,
+      "fim_utc": "2026-10-08T22:46:59.277934+00:00"
+    },
+    {
+      "comando": [
+        "ssh",
+        "-o",
+        "BatchMode=yes",
+        "-o",
+        "ConnectTimeout=10",
+        "-p",
+        "2222",
+        "osboxes@127.0.0.1",
+        "/home/osboxes/atividade-2-poi/.venv/bin/python /home/osboxes/atividade-2-poi/scripts/experimentacao/agente_linux.py"
+      ],
+      "inicio_utc": "2026-10-08T22:47:00.278399+00:00",
+      "entrada_json": {
+        "acao": "estado",
+        "token": "647f5ed3-4c53-41ae-8aa4-5b149d33094c"
+      },
+      "codigo_saida": 0,
+      "fim_utc": "2026-10-08T22:47:00.845863+00:00"
+    },
+    {
+      "comando": [
+        "ssh",
+        "-o",
+        "BatchMode=yes",
+        "-o",
+        "ConnectTimeout=10",
+        "-p",
+        "2222",
+        "osboxes@127.0.0.1",
+        "/home/osboxes/atividade-2-poi/.venv/bin/python /home/osboxes/atividade-2-poi/scripts/experimentacao/agente_linux.py"
+      ],
+      "inicio_utc": "2026-10-08T22:47:01.846378+00:00",
+      "entrada_json": {
+        "acao": "estado",
+        "token": "647f5ed3-4c53-41ae-8aa4-5b149d33094c"
+      },
+      "codigo_saida": 0,
+      "fim_utc": "2026-10-08T22:47:02.142163+00:00"
+    },
+    {
+      "comando": [
+        "ssh",
+        "-o",
+        "BatchMode=yes",
+        "-o",
+        "ConnectTimeout=10",
+        "-p",
+        "2222",
+        "osboxes@127.0.0.1",
+        "/home/osboxes/atividade-2-poi/.venv/bin/python /home/osboxes/atividade-2-poi/scripts/experimentacao/agente_linux.py"
+      ],
+      "inicio_utc": "2026-10-08T22:47:03.142612+00:00",
+      "entrada_json": {
+        "acao": "estado",
+        "token": "647f5ed3-4c53-41ae-8aa4-5b149d33094c"
+      },
+      "codigo_saida": 0,
+      "fim_utc": "2026-10-08T22:47:03.433441+00:00"
+    },
+    {
+      "comando": [
+        "ssh",
+        "-o",
+        "BatchMode=yes",
+        "-o",
+        "ConnectTimeout=10",
+        "-p",
+        "2222",
+        "osboxes@127.0.0.1",
+        "/home/osboxes/atividade-2-poi/.venv/bin/python /home/osboxes/atividade-2-poi/scripts/experimentacao/agente_linux.py"
+      ],
+      "inicio_utc": "2026-10-08T22:47:04.434129+00:00",
+      "entrada_json": {
+        "acao": "estado",
+        "token": "647f5ed3-4c53-41ae-8aa4-5b149d33094c"
+      },
+      "codigo_saida": 0,
+      "fim_utc": "2026-10-08T22:47:04.721555+00:00"
+    },
+    {
+      "comando": [
+        "ssh",
+        "-o",
+        "BatchMode=yes",
+        "-o",
+        "ConnectTimeout=10",
+        "-p",
+        "2222",
+        "osboxes@127.0.0.1",
+        "/home/osboxes/atividade-2-poi/.venv/bin/python /home/osboxes/atividade-2-poi/scripts/experimentacao/agente_linux.py"
+      ],
+      "inicio_utc": "2026-10-08T22:47:05.721785+00:00",
+      "entrada_json": {
+        "acao": "estado",
+        "token": "647f5ed3-4c53-41ae-8aa4-5b149d33094c"
+      },
+      "codigo_saida": 0,
+      "fim_utc": "2026-10-08T22:47:06.009655+00:00"
+    },
+    {
+      "comando": [
+        "ssh",
+        "-o",
+        "BatchMode=yes",
+        "-o",
+        "ConnectTimeout=10",
+        "-p",
+        "2222",
+        "osboxes@127.0.0.1",
+        "/home/osboxes/atividade-2-poi/.venv/bin/python /home/osboxes/atividade-2-poi/scripts/experimentacao/agente_linux.py"
+      ],
+      "inicio_utc": "2026-10-08T22:47:07.010066+00:00",
+      "entrada_json": {
+        "acao": "estado",
+        "token": "647f5ed3-4c53-41ae-8aa4-5b149d33094c"
+      },
+      "codigo_saida": 0,
+      "fim_utc": "2026-10-08T22:47:07.293178+00:00"
+    },
+    {
+      "comando": [
+        "ssh",
+        "-o",
+        "BatchMode=yes",
+        "-o",
+        "ConnectTimeout=10",
+        "-p",
+        "2222",
+        "osboxes@127.0.0.1",
+        "/home/osboxes/atividade-2-poi/.venv/bin/python /home/osboxes/atividade-2-poi/scripts/experimentacao/agente_linux.py"
+      ],
+      "inicio_utc": "2026-10-08T22:47:08.293425+00:00",
+      "entrada_json": {
+        "acao": "estado",
+        "token": "647f5ed3-4c53-41ae-8aa4-5b149d33094c"
+      },
+      "codigo_saida": 0,
+      "fim_utc": "2026-10-08T22:47:08.582121+00:00"
+    },
+    {
+      "comando": [
+        "ssh",
+        "-o",
+        "BatchMode=yes",
+        "-o",
+        "ConnectTimeout=10",
+        "-p",
+        "2222",
+        "osboxes@127.0.0.1",
+        "/home/osboxes/atividade-2-poi/.venv/bin/python /home/osboxes/atividade-2-poi/scripts/experimentacao/agente_linux.py"
+      ],
+      "inicio_utc": "2026-10-08T22:47:09.582628+00:00",
+      "entrada_json": {
+        "acao": "estado",
+        "token": "647f5ed3-4c53-41ae-8aa4-5b149d33094c"
+      },
+      "codigo_saida": 0,
+      "fim_utc": "2026-10-08T22:47:09.873638+00:00"
+    },
+    {
+      "comando": [
+        "ssh",
+        "-o",
+        "BatchMode=yes",
+        "-o",
+        "ConnectTimeout=10",
+        "-p",
+        "2222",
+        "osboxes@127.0.0.1",
+        "/home/osboxes/atividade-2-poi/.venv/bin/python /home/osboxes/atividade-2-poi/scripts/experimentacao/agente_linux.py"
+      ],
+      "inicio_utc": "2026-10-08T22:47:10.873912+00:00",
+      "entrada_json": {
+        "acao": "estado",
+        "token": "647f5ed3-4c53-41ae-8aa4-5b149d33094c"
+      },
+      "codigo_saida": 0,
+      "fim_utc": "2026-10-08T22:47:11.162016+00:00"
+    },
+    {
+      "comando": [
+        "ssh",
+        "-o",
+        "BatchMode=yes",
+        "-o",
+        "ConnectTimeout=10",
+        "-p",
+        "2222",
+        "osboxes@127.0.0.1",
+        "/home/osboxes/atividade-2-poi/.venv/bin/python /home/osboxes/atividade-2-poi/scripts/experimentacao/agente_linux.py"
+      ],
+      "inicio_utc": "2026-10-08T22:47:12.162448+00:00",
+      "entrada_json": {
+        "acao": "estado",
+        "token": "647f5ed3-4c53-41ae-8aa4-5b149d33094c"
+      },
+      "codigo_saida": 0,
+      "fim_utc": "2026-10-08T22:47:12.456993+00:00"
+    },
+    {
+      "comando": [
+        "ssh",
+        "-o",
+        "BatchMode=yes",
+        "-o",
+        "ConnectTimeout=10",
+        "-p",
+        "2222",
+        "osboxes@127.0.0.1",
+        "/home/osboxes/atividade-2-poi/.venv/bin/python /home/osboxes/atividade-2-poi/scripts/experimentacao/agente_linux.py"
+      ],
+      "inicio_utc": "2026-10-08T22:47:13.457575+00:00",
+      "entrada_json": {
+        "acao": "estado",
+        "token": "647f5ed3-4c53-41ae-8aa4-5b149d33094c"
+      },
+      "codigo_saida": 0,
+      "fim_utc": "2026-10-08T22:47:13.751375+00:00"
+    },
+    {
+      "comando": [
+        "ssh",
+        "-o",
+        "BatchMode=yes",
+        "-o",
+        "ConnectTimeout=10",
+        "-p",
+        "2222",
+        "osboxes@127.0.0.1",
+        "/home/osboxes/atividade-2-poi/.venv/bin/python /home/osboxes/atividade-2-poi/scripts/experimentacao/agente_linux.py"
+      ],
+      "inicio_utc": "2026-10-08T22:47:14.752009+00:00",
+      "entrada_json": {
+        "acao": "estado",
+        "token": "647f5ed3-4c53-41ae-8aa4-5b149d33094c"
+      },
+      "codigo_saida": 0,
+      "fim_utc": "2026-10-08T22:47:15.042842+00:00"
+    },
+    {
+      "comando": [
+        "ssh",
+        "-o",
+        "BatchMode=yes",
+        "-o",
+        "ConnectTimeout=10",
+        "-p",
+        "2222",
+        "osboxes@127.0.0.1",
+        "/home/osboxes/atividade-2-poi/.venv/bin/python /home/osboxes/atividade-2-poi/scripts/experimentacao/agente_linux.py"
+      ],
+      "inicio_utc": "2026-10-08T22:47:16.043093+00:00",
+      "entrada_json": {
+        "acao": "estado",
+        "token": "647f5ed3-4c53-41ae-8aa4-5b149d33094c"
+      },
+      "codigo_saida": 0,
+      "fim_utc": "2026-10-08T22:47:16.335973+00:00"
+    },
+    {
+      "comando": [
+        "ssh",
+        "-o",
+        "BatchMode=yes",
+        "-o",
+        "ConnectTimeout=10",
+        "-p",
+        "2222",
+        "osboxes@127.0.0.1",
+        "/home/osboxes/atividade-2-poi/.venv/bin/python /home/osboxes/atividade-2-poi/scripts/experimentacao/agente_linux.py"
+      ],
+      "inicio_utc": "2026-10-08T22:47:17.336450+00:00",
+      "entrada_json": {
+        "acao": "estado",
+        "token": "647f5ed3-4c53-41ae-8aa4-5b149d33094c"
+      },
+      "codigo_saida": 0,
+      "fim_utc": "2026-10-08T22:47:17.634647+00:00"
+    },
+    {
+      "comando": [
+        "ssh",
+        "-o",
+        "BatchMode=yes",
+        "-o",
+        "ConnectTimeout=10",
+        "-p",
+        "2222",
+        "osboxes@127.0.0.1",
+        "/home/osboxes/atividade-2-poi/.venv/bin/python /home/osboxes/atividade-2-poi/scripts/experimentacao/agente_linux.py"
+      ],
+      "inicio_utc": "2026-10-08T22:47:18.634938+00:00",
+      "entrada_json": {
+        "acao": "estado",
+        "token": "647f5ed3-4c53-41ae-8aa4-5b149d33094c"
+      },
+      "codigo_saida": 0,
+      "fim_utc": "2026-10-08T22:47:18.928335+00:00"
+    },
+    {
+      "comando": [
+        "ssh",
+        "-o",
+        "BatchMode=yes",
+        "-o",
+        "ConnectTimeout=10",
+        "-p",
+        "2222",
+        "osboxes@127.0.0.1",
+        "/home/osboxes/atividade-2-poi/.venv/bin/python /home/osboxes/atividade-2-poi/scripts/experimentacao/agente_linux.py"
+      ],
+      "inicio_utc": "2026-10-08T22:47:19.928918+00:00",
+      "entrada_json": {
+        "acao": "estado",
+        "token": "647f5ed3-4c53-41ae-8aa4-5b149d33094c"
+      },
+      "codigo_saida": 0,
+      "fim_utc": "2026-10-08T22:47:20.244430+00:00"
+    },
+    {
+      "comando": [
+        "ssh",
+        "-o",
+        "BatchMode=yes",
+        "-o",
+        "ConnectTimeout=10",
+        "-p",
+        "2222",
+        "osboxes@127.0.0.1",
+        "/home/osboxes/atividade-2-poi/.venv/bin/python /home/osboxes/atividade-2-poi/scripts/experimentacao/agente_linux.py"
+      ],
+      "inicio_utc": "2026-10-08T22:47:21.245095+00:00",
+      "entrada_json": {
+        "acao": "estado",
+        "token": "647f5ed3-4c53-41ae-8aa4-5b149d33094c"
+      },
+      "codigo_saida": 0,
+      "fim_utc": "2026-10-08T22:47:21.539557+00:00"
+    },
+    {
+      "comando": [
+        "ssh",
+        "-o",
+        "BatchMode=yes",
+        "-o",
+        "ConnectTimeout=10",
+        "-p",
+        "2222",
+        "osboxes@127.0.0.1",
+        "/home/osboxes/atividade-2-poi/.venv/bin/python /home/osboxes/atividade-2-poi/scripts/experimentacao/agente_linux.py"
+      ],
+      "inicio_utc": "2026-10-08T22:47:22.539927+00:00",
+      "entrada_json": {
+        "acao": "estado",
+        "token": "647f5ed3-4c53-41ae-8aa4-5b149d33094c"
+      },
+      "codigo_saida": 0,
+      "fim_utc": "2026-10-08T22:47:22.833019+00:00"
+    },
+    {
+      "comando": [
+        "ssh",
+        "-o",
+        "BatchMode=yes",
+        "-o",
+        "ConnectTimeout=10",
+        "-p",
+        "2222",
+        "osboxes@127.0.0.1",
+        "/home/osboxes/atividade-2-poi/.venv/bin/python /home/osboxes/atividade-2-poi/scripts/experimentacao/agente_linux.py"
+      ],
+      "inicio_utc": "2026-10-08T22:47:23.833263+00:00",
+      "entrada_json": {
+        "acao": "estado",
+        "token": "647f5ed3-4c53-41ae-8aa4-5b149d33094c"
+      },
+      "codigo_saida": 0,
+      "fim_utc": "2026-10-08T22:47:24.117992+00:00"
+    },
+    {
+      "comando": [
+        "ssh",
+        "-o",
+        "BatchMode=yes",
+        "-o",
+        "ConnectTimeout=10",
+        "-p",
+        "2222",
+        "osboxes@127.0.0.1",
+        "/home/osboxes/atividade-2-poi/.venv/bin/python /home/osboxes/atividade-2-poi/scripts/experimentacao/agente_linux.py"
+      ],
+      "inicio_utc": "2026-10-08T22:47:25.118590+00:00",
+      "entrada_json": {
+        "acao": "estado",
+        "token": "647f5ed3-4c53-41ae-8aa4-5b149d33094c"
+      },
+      "codigo_saida": 0,
+      "fim_utc": "2026-10-08T22:47:25.405765+00:00"
+    },
+    {
+      "comando": [
+        "ssh",
+        "-o",
+        "BatchMode=yes",
+        "-o",
+        "ConnectTimeout=10",
+        "-p",
+        "2222",
+        "osboxes@127.0.0.1",
+        "/home/osboxes/atividade-2-poi/.venv/bin/python /home/osboxes/atividade-2-poi/scripts/experimentacao/agente_linux.py"
+      ],
+      "inicio_utc": "2026-10-08T22:47:26.406182+00:00",
+      "entrada_json": {
+        "acao": "estado",
+        "token": "647f5ed3-4c53-41ae-8aa4-5b149d33094c"
+      },
+      "codigo_saida": 0,
+      "fim_utc": "2026-10-08T22:47:26.689055+00:00"
+    },
+    {
+      "comando": [
+        "ssh",
+        "-o",
+        "BatchMode=yes",
+        "-o",
+        "ConnectTimeout=10",
+        "-p",
+        "2222",
+        "osboxes@127.0.0.1",
+        "/home/osboxes/atividade-2-poi/.venv/bin/python /home/osboxes/atividade-2-poi/scripts/experimentacao/agente_linux.py"
+      ],
+      "inicio_utc": "2026-10-08T22:47:27.689478+00:00",
+      "entrada_json": {
+        "acao": "estado",
+        "token": "647f5ed3-4c53-41ae-8aa4-5b149d33094c"
+      },
+      "codigo_saida": 0,
+      "fim_utc": "2026-10-08T22:47:27.982141+00:00"
+    },
+    {
+      "comando": [
+        "ssh",
+        "-o",
+        "BatchMode=yes",
+        "-o",
+        "ConnectTimeout=10",
+        "-p",
+        "2222",
+        "osboxes@127.0.0.1",
+        "/home/osboxes/atividade-2-poi/.venv/bin/python /home/osboxes/atividade-2-poi/scripts/experimentacao/agente_linux.py"
+      ],
+      "inicio_utc": "2026-10-08T22:47:28.982643+00:00",
+      "entrada_json": {
+        "acao": "estado",
+        "token": "647f5ed3-4c53-41ae-8aa4-5b149d33094c"
+      },
+      "codigo_saida": 0,
+      "fim_utc": "2026-10-08T22:47:29.269045+00:00"
+    },
+    {
+      "comando": [
+        "ssh",
+        "-o",
+        "BatchMode=yes",
+        "-o",
+        "ConnectTimeout=10",
+        "-p",
+        "2222",
+        "osboxes@127.0.0.1",
+        "/home/osboxes/atividade-2-poi/.venv/bin/python /home/osboxes/atividade-2-poi/scripts/experimentacao/agente_linux.py"
+      ],
+      "inicio_utc": "2026-10-08T22:47:30.269741+00:00",
+      "entrada_json": {
+        "acao": "estado",
+        "token": "647f5ed3-4c53-41ae-8aa4-5b149d33094c"
+      },
+      "codigo_saida": 0,
+      "fim_utc": "2026-10-08T22:47:30.602499+00:00"
+    },
+    {
+      "comando": [
+        "ssh",
+        "-o",
+        "BatchMode=yes",
+        "-o",
+        "ConnectTimeout=10",
+        "-p",
+        "2222",
+        "osboxes@127.0.0.1",
+        "/home/osboxes/atividade-2-poi/.venv/bin/python /home/osboxes/atividade-2-poi/scripts/experimentacao/agente_linux.py"
+      ],
+      "inicio_utc": "2026-10-08T22:47:31.602705+00:00",
+      "entrada_json": {
+        "acao": "estado",
+        "token": "647f5ed3-4c53-41ae-8aa4-5b149d33094c"
+      },
+      "codigo_saida": 0,
+      "fim_utc": "2026-10-08T22:47:31.896927+00:00"
+    },
+    {
+      "comando": [
+        "ssh",
+        "-o",
+        "BatchMode=yes",
+        "-o",
+        "ConnectTimeout=10",
+        "-p",
+        "2222",
+        "osboxes@127.0.0.1",
+        "/home/osboxes/atividade-2-poi/.venv/bin/python /home/osboxes/atividade-2-poi/scripts/experimentacao/agente_linux.py"
+      ],
+      "inicio_utc": "2026-10-08T22:47:32.897331+00:00",
+      "entrada_json": {
+        "acao": "estado",
+        "token": "647f5ed3-4c53-41ae-8aa4-5b149d33094c"
+      },
+      "codigo_saida": 0,
+      "fim_utc": "2026-10-08T22:47:33.189960+00:00"
+    },
+    {
+      "comando": [
+        "ssh",
+        "-o",
+        "BatchMode=yes",
+        "-o",
+        "ConnectTimeout=10",
+        "-p",
+        "2222",
+        "osboxes@127.0.0.1",
+        "/home/osboxes/atividade-2-poi/.venv/bin/python /home/osboxes/atividade-2-poi/scripts/experimentacao/agente_linux.py"
+      ],
+      "inicio_utc": "2026-10-08T22:47:34.190377+00:00",
+      "entrada_json": {
+        "acao": "estado",
+        "token": "647f5ed3-4c53-41ae-8aa4-5b149d33094c"
+      },
+      "codigo_saida": 0,
+      "fim_utc": "2026-10-08T22:47:34.481364+00:00"
+    },
+    {
+      "comando": [
+        "ssh",
+        "-o",
+        "BatchMode=yes",
+        "-o",
+        "ConnectTimeout=10",
+        "-p",
+        "2222",
+        "osboxes@127.0.0.1",
+        "/home/osboxes/atividade-2-poi/.venv/bin/python /home/osboxes/atividade-2-poi/scripts/experimentacao/agente_linux.py"
+      ],
+      "inicio_utc": "2026-10-08T22:47:35.481653+00:00",
+      "entrada_json": {
+        "acao": "estado",
+        "token": "647f5ed3-4c53-41ae-8aa4-5b149d33094c"
+      },
+      "codigo_saida": 0,
+      "fim_utc": "2026-10-08T22:47:35.768629+00:00"
+    },
+    {
+      "comando": [
+        "ssh",
+        "-o",
+        "BatchMode=yes",
+        "-o",
+        "ConnectTimeout=10",
+        "-p",
+        "2222",
+        "osboxes@127.0.0.1",
+        "/home/osboxes/atividade-2-poi/.venv/bin/python /home/osboxes/atividade-2-poi/scripts/experimentacao/agente_linux.py"
+      ],
+      "inicio_utc": "2026-10-08T22:47:36.769073+00:00",
+      "entrada_json": {
+        "acao": "estado",
+        "token": "647f5ed3-4c53-41ae-8aa4-5b149d33094c"
+      },
+      "codigo_saida": 0,
+      "fim_utc": "2026-10-08T22:47:37.059368+00:00"
+    },
+    {
+      "comando": [
+        "ssh",
+        "-o",
+        "BatchMode=yes",
+        "-o",
+        "ConnectTimeout=10",
+        "-p",
+        "2222",
+        "osboxes@127.0.0.1",
+        "/home/osboxes/atividade-2-poi/.venv/bin/python /home/osboxes/atividade-2-poi/scripts/experimentacao/agente_linux.py"
+      ],
+      "inicio_utc": "2026-10-08T22:47:38.059909+00:00",
+      "entrada_json": {
+        "acao": "estado",
+        "token": "647f5ed3-4c53-41ae-8aa4-5b149d33094c"
+      },
+      "codigo_saida": 0,
+      "fim_utc": "2026-10-08T22:47:38.351216+00:00"
+    },
+    {
+      "comando": [
+        "ssh",
+        "-o",
+        "BatchMode=yes",
+        "-o",
+        "ConnectTimeout=10",
+        "-p",
+        "2222",
+        "osboxes@127.0.0.1",
+        "/home/osboxes/atividade-2-poi/.venv/bin/python /home/osboxes/atividade-2-poi/scripts/experimentacao/agente_linux.py"
+      ],
+      "inicio_utc": "2026-10-08T22:47:39.351907+00:00",
+      "entrada_json": {
+        "acao": "estado",
+        "token": "647f5ed3-4c53-41ae-8aa4-5b149d33094c"
+      },
+      "codigo_saida": 0,
+      "fim_utc": "2026-10-08T22:47:39.639463+00:00"
+    },
+    {
+      "comando": [
+        "ssh",
+        "-o",
+        "BatchMode=yes",
+        "-o",
+        "ConnectTimeout=10",
+        "-p",
+        "2222",
+        "osboxes@127.0.0.1",
+        "/home/osboxes/atividade-2-poi/.venv/bin/python /home/osboxes/atividade-2-poi/scripts/experimentacao/agente_linux.py"
+      ],
+      "inicio_utc": "2026-10-08T22:47:40.640034+00:00",
+      "entrada_json": {
+        "acao": "estado",
+        "token": "647f5ed3-4c53-41ae-8aa4-5b149d33094c"
+      },
+      "codigo_saida": 0,
+      "fim_utc": "2026-10-08T22:47:40.923918+00:00"
+    },
+    {
+      "comando": [
+        "ssh",
+        "-o",
+        "BatchMode=yes",
+        "-o",
+        "ConnectTimeout=10",
+        "-p",
+        "2222",
+        "osboxes@127.0.0.1",
+        "/home/osboxes/atividade-2-poi/.venv/bin/python /home/osboxes/atividade-2-poi/scripts/experimentacao/agente_linux.py"
+      ],
+      "inicio_utc": "2026-10-08T22:47:41.924486+00:00",
+      "entrada_json": {
+        "acao": "estado",
+        "token": "647f5ed3-4c53-41ae-8aa4-5b149d33094c"
+      },
+      "codigo_saida": 0,
+      "fim_utc": "2026-10-08T22:47:42.215710+00:00"
+    },
+    {
+      "comando": [
+        "ssh",
+        "-o",
+        "BatchMode=yes",
+        "-o",
+        "ConnectTimeout=10",
+        "-p",
+        "2222",
+        "osboxes@127.0.0.1",
+        "/home/osboxes/atividade-2-poi/.venv/bin/python /home/osboxes/atividade-2-poi/scripts/experimentacao/agente_linux.py"
+      ],
+      "inicio_utc": "2026-10-08T22:47:43.216245+00:00",
+      "entrada_json": {
+        "acao": "estado",
+        "token": "647f5ed3-4c53-41ae-8aa4-5b149d33094c"
+      },
+      "codigo_saida": 0,
+      "fim_utc": "2026-10-08T22:47:43.500491+00:00"
+    },
+    {
+      "comando": [
+        "ssh",
+        "-o",
+        "BatchMode=yes",
+        "-o",
+        "ConnectTimeout=10",
+        "-p",
+        "2222",
+        "osboxes@127.0.0.1",
+        "/home/osboxes/atividade-2-poi/.venv/bin/python /home/osboxes/atividade-2-poi/scripts/experimentacao/agente_linux.py"
+      ],
+      "inicio_utc": "2026-10-08T22:47:44.501156+00:00",
+      "entrada_json": {
+        "acao": "estado",
+        "token": "647f5ed3-4c53-41ae-8aa4-5b149d33094c"
+      },
+      "codigo_saida": 0,
+      "fim_utc": "2026-10-08T22:47:44.787333+00:00"
+    },
+    {
+      "comando": [
+        "scp",
+        "-o",
+        "BatchMode=yes",
+        "-P",
+        "2222",
+        "-r",
+        "osboxes@127.0.0.1:/home/osboxes/atividade-2-poi/experimentos/resultados/carga/memoria/C4/usuarios_03/repeticao_2002/monitoramento_linux",
+        "D:\\atividade-2-poi\\experimentos\\resultados\\carga\\memoria\\C4\\usuarios_03\\repeticao_2002\\monitoramento_linux"
+      ],
+      "inicio_utc": "2026-10-08T22:47:44.787577+00:00",
+      "codigo_saida": 0,
+      "fim_utc": "2026-10-08T22:47:45.151950+00:00"
+    },
+    {
+      "comando": [
+        "D:\\atividade-2-poi\\.venv\\Scripts\\python.exe",
+        "-B",
+        "D:\\atividade-2-poi\\scripts\\analise\\consolidar_resultados.py",
+        "D:\\atividade-2-poi\\experimentos\\resultados\\carga\\memoria\\C4\\usuarios_03\\repeticao_2002",
+        "--saida",
+        "D:\\atividade-2-poi\\experimentos\\resultados\\orquestracao\\definitivos_C4_01\\memoria_C4_u03_r2002\\analise"
+      ],
+      "inicio_utc": "2026-10-08T22:47:45.170400+00:00",
+      "codigo_saida": 0,
+      "fim_utc": "2026-10-08T22:47:45.378514+00:00"
+    }
+  ],
+  "ambiente_verificado": {
+    "cpus": 2,
+    "ram_total_bytes": 2073604096,
+    "servidores": [
+      {
+        "aplicacao": "memoria",
+        "pid_principal": 1051,
+        "workers": 2,
+        "processos": [
+          {
+            "pid": 1051,
+            "criado_epoch_s": 1791490686.26,
+            "ppid": 1042,
+            "comando": [
+              "python",
+              "-m",
+              "uvicorn",
+              "scripts.monitoramento.servidor_experimental:criar_app",
+              "--factory",
+              "--host",
+              "0.0.0.0",
+              "--port",
+              "8002",
+              "--workers",
+              "2"
+            ],
+            "variaveis_relevantes": {
+              "MEMORY_RETENCAO_SEGUNDOS": "1"
+            },
+            "defaults_utilizados": {
+              "MEMORY_LIMITE_MIN_MB": "1",
+              "MEMORY_LIMITE_MAX_MB": "64",
+              "MEMORY_MAX_SIMULTANEAS": "4"
+            }
+          },
+          {
+            "pid": 1053,
+            "criado_epoch_s": 1791490686.68,
+            "ppid": 1051,
+            "comando": [
+              "/home/osboxes/atividade-2-poi/.venv/bin/python",
+              "-c",
+              "from multiprocessing.spawn import spawn_main; spawn_main(tracker_fd=7, pipe_handle=9)",
+              "--multiprocessing-fork"
+            ],
+            "variaveis_relevantes": {
+              "MEMORY_RETENCAO_SEGUNDOS": "1"
+            },
+            "defaults_utilizados": {
+              "MEMORY_LIMITE_MIN_MB": "1",
+              "MEMORY_LIMITE_MAX_MB": "64",
+              "MEMORY_MAX_SIMULTANEAS": "4"
+            }
+          },
+          {
+            "pid": 1054,
+            "criado_epoch_s": 1791490686.68,
+            "ppid": 1051,
+            "comando": [
+              "/home/osboxes/atividade-2-poi/.venv/bin/python",
+              "-c",
+              "from multiprocessing.spawn import spawn_main; spawn_main(tracker_fd=7, pipe_handle=13)",
+              "--multiprocessing-fork"
+            ],
+            "variaveis_relevantes": {
+              "MEMORY_RETENCAO_SEGUNDOS": "1"
+            },
+            "defaults_utilizados": {
+              "MEMORY_LIMITE_MIN_MB": "1",
+              "MEMORY_LIMITE_MAX_MB": "64",
+              "MEMORY_MAX_SIMULTANEAS": "4"
+            }
+          }
+        ],
+        "configuracao_verificada": {
+          "MEMORY_LIMITE_MIN_MB": 1,
+          "MEMORY_LIMITE_MAX_MB": 64,
+          "MEMORY_MAX_SIMULTANEAS": 4,
+          "MEMORY_RETENCAO_SEGUNDOS": 1.0
+        },
+        "defaults_auditados": {
+          "MEMORY_LIMITE_MIN_MB": "1",
+          "MEMORY_LIMITE_MAX_MB": "64",
+          "MEMORY_MAX_SIMULTANEAS": "4",
+          "MEMORY_RETENCAO_SEGUNDOS": "0"
+        },
+        "codigo_sha256": "6c325fc100afc22058ce5737a8b5283d1c74b9fede653939be94611d00880a4b",
+        "diretorio_io": null,
+        "espaco_io_livre_bytes": null
+      }
+    ],
+    "resultados_escrita": true
+  },
+  "monitor": {
+    "token": "647f5ed3-4c53-41ae-8aa4-5b149d33094c",
+    "pid": 99990,
+    "criado_epoch_s": 1791499463.79,
+    "comando": [
+      "/home/osboxes/atividade-2-poi/.venv/bin/python",
+      "-u",
+      "/home/osboxes/atividade-2-poi/scripts/monitoramento/monitorar_linux.py",
+      "--pid",
+      "1051",
+      "--aplicacao",
+      "memoria",
+      "--cenario",
+      "C4",
+      "--usuarios",
+      "3",
+      "--repeticao",
+      "2002",
+      "--intervalo",
+      "1",
+      "--duracao",
+      "200",
+      "--diagnostico-cpu",
+      "--condicoes",
+      "Orquestrador; token=647f5ed3-4c53-41ae-8aa4-5b149d33094c",
+      "--memoria-detalhada"
+    ],
+    "monitoramento": "/home/osboxes/atividade-2-poi/experimentos/resultados/carga/memoria/C4/usuarios_03/repeticao_2002/monitoramento_linux",
+    "job": {
+      "aplicacao": "memoria",
+      "cenario": "C4",
+      "usuarios": 3,
+      "repeticao": 2002,
+      "repeticao_logica": 2,
+      "tentativa": 1,
+      "caminho": "experimentos/resultados/carga/memoria/C4/usuarios_03/repeticao_2002",
+      "aquecimento_s": 30,
+      "medicao_configurada_s": 60,
+      "espera_s": 0,
+      "conexoes": "fechar",
+      "taxa": 3,
+      "parametros_http": {
+        "tamanho_mb": 50
+      }
+    }
+  },
+  "artefatos_sha256": {
+    "D:\\atividade-2-poi\\experimentos\\resultados\\orquestracao\\definitivos_C4_01\\memoria_C4_u03_r2002\\analise\\consolidado.csv": "85d8dff59c0e655fb6baedc0bf22b73c73a3c5edb77f7cfa39fc662d0da5742f",
+    "D:\\atividade-2-poi\\experimentos\\resultados\\orquestracao\\definitivos_C4_01\\memoria_C4_u03_r2002\\analise\\resumo.txt": "c2e1c79af239b2b14c28fd5f43aec467b744c8190314322e6740372659123a0f",
+    "D:\\atividade-2-poi\\experimentos\\resultados\\carga\\memoria\\C4\\usuarios_03\\repeticao_2002\\parametros.json": "b7a2da21bfbd9799770d0409cb951bc6fc81722774bcb8acbd5726f7a3527dde",
+    "D:\\atividade-2-poi\\experimentos\\resultados\\carga\\memoria\\C4\\usuarios_03\\repeticao_2002\\monitoramento_linux\\metadados.json": "0dc6ae4aa2b231a2c6902f08ee4a36a834d827a464f28a8e4a68d22115b0389c",
+    "D:\\atividade-2-poi\\experimentos\\resultados\\carga\\memoria\\C4\\usuarios_03\\repeticao_2002\\medicao_latencias.csv": "b2f155c41d895d4e47fb7592ec6ea9114a79ebc7b39726f4b27d7f22e0319dde",
+    "D:\\atividade-2-poi\\experimentos\\resultados\\orquestracao\\definitivos_C4_01\\memoria_C4_u03_r2002\\relogio_antes.json": "83c2b9d7c2b5cfb76c949078d15ca2c7a38ec08a1596c4069e4d233c031caef0",
+    "D:\\atividade-2-poi\\experimentos\\resultados\\orquestracao\\definitivos_C4_01\\memoria_C4_u03_r2002\\relogio_depois.json": "0e391d07840adaf332f62d009ecceb24cbd665854eabfef089256d5221a885a6"
+  },
+  "avisos": "Métricas snapshot são do CSV acumulado exportado, não necessariamente do encerramento nem da janela recortada. | Correção estimada de relógio: assume offset constante; incerteza de rede não cobre deriva posterior. | Sincronização dos relógios não confirmada: alinhamento UTC é provisório. | CPU global: tempo ocupado /proc/stat menor que tempo da árvore em intervalos próximos; leituras sequenciais e fontes incompatíveis exigem investigação.",
+  "analise": "D:\\atividade-2-poi\\experimentos\\resultados\\orquestracao\\definitivos_C4_01\\memoria_C4_u03_r2002\\analise",
+  "resultados": "D:\\atividade-2-poi\\experimentos\\resultados\\carga\\memoria\\C4\\usuarios_03\\repeticao_2002",
+  "fim_utc": "2026-10-08T22:47:45.392760+00:00"
+}

@@ -126,7 +126,55 @@ def agora():
     return datetime.now(timezone.utc).isoformat()
 
 
-def validar_fase(directory, phase, users, diagnostic):
+def historico_na_janela(history, start, end, audit):
+    """Locust int(now): timestamp inteiro identifica [t,t+1), não um instante."""
+    selected, boundaries = [], []
+    previous = None
+    previous_counters = None
+    counter_fields = ("Total Request Count", "Total Failure Count")
+    has_counters = any(any(field in row for field in counter_fields) for row in history)
+    repeated = 0
+    for row in history:
+        stamp, count = float(row["Timestamp"]), float(row["User Count"])
+        if (not math.isfinite(stamp) or not math.isfinite(count)
+                or count < 0 or not count.is_integer()):
+            raise ValueError("Timestamp/User Count inválido no histórico")
+        if previous is not None and stamp < previous:
+            raise ValueError("Histórico Aggregated fora de ordem: retrocesso temporal")
+        counters = None
+        if has_counters:
+            counters = tuple(float(row[field]) for field in counter_fields)
+            if any(not math.isfinite(v) or v < 0 or not v.is_integer() for v in counters):
+                raise ValueError("Contadores acumulados inválidos no histórico")
+            if counters[1] > counters[0]:
+                raise ValueError("Falhas acumuladas excedem requisições no histórico")
+        if stamp == previous:
+            repeated += 1
+            if counters is None:
+                raise ValueError("Timestamp repetido sem contadores acumulados para verificar consistência")
+        previous = stamp
+        # Históricos fracionários (por exemplo fixtures/exportadores) mantêm precisão.
+        upper = stamp + 1 if stamp.is_integer() else stamp
+        if start <= stamp < end and upper <= end:
+            if counters is not None and previous_counters is not None:
+                requests_delta = counters[0] - previous_counters[0]
+                failures_delta = counters[1] - previous_counters[1]
+                if requests_delta < 0 or failures_delta < 0:
+                    raise ValueError("Contador acumulado regressivo durante a janela de carga")
+                if failures_delta > requests_delta:
+                    raise ValueError("Avanço de falhas excede avanço de requisições durante a janela")
+            previous_counters = counters
+            selected.append(row)
+        elif stamp < end and upper >= start:
+            boundaries.append({"timestamp": row["Timestamp"], "usuarios": int(count)})
+    audit.update(politica="Timestamp inteiro representa [t,t+1); somente buckets inteiramente na janela",
+                 snapshots_disponiveis=len(history), snapshots_inteiros_na_janela=len(selected),
+                 snapshots_timestamp_repetido=repeated, contadores_acumulados_presentes=has_counters,
+                 snapshots_fronteira=boundaries)
+    return selected
+
+
+def validar_fase(directory, phase, users, diagnostic, audit=None):
     """Código zero não comprova carga válida nem encerramento sem erros."""
     errors = []
     if not isinstance(diagnostic, dict):
@@ -148,8 +196,9 @@ def validar_fase(directory, phase, users, diagnostic):
         end = datetime.fromisoformat(diagnostic["encerramento_inicio_utc"])
         if start.tzinfo is None or end.tzinfo is None or start >= end:
             raise ValueError("Marcos UTC inválidos")
-        inside = [r for r in history if start.timestamp() < float(r["Timestamp"]) < end.timestamp()]
-        if len({r["Timestamp"] for r in inside if float(r["User Count"]) == users}) < 2:
+        inside = historico_na_janela(history, start.timestamp(), end.timestamp(),
+                                    audit if audit is not None else {})
+        if len({float(r["Timestamp"]) for r in inside if float(r["User Count"]) == users}) < 2:
             errors.append("Sem dois snapshots de carga com a quantidade solicitada de usuários.")
         if any(float(r["User Count"]) != users for r in inside):
             errors.append("Quantidade de usuários divergiu do plano durante a janela.")
@@ -228,7 +277,9 @@ def main(argv=None):
                 entry["instrumentacao"] = json.loads(diagnostic.read_text(encoding="utf-8"))
             except (OSError, ValueError):
                 entry["instrumentacao"] = {}
-            issues = validar_fase(directory, phase, options.usuarios, entry["instrumentacao"])
+            entry["validacao_historico"] = {}
+            issues = validar_fase(directory, phase, options.usuarios, entry["instrumentacao"],
+                                 entry["validacao_historico"])
             entry.update(estado="falha" if completed.returncode or issues else "concluido",
                          erros_validacao=issues)
         except (OSError, KeyboardInterrupt) as error:

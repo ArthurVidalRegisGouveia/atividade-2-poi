@@ -15,22 +15,21 @@ def csv_file(path, row):
         writer.writerow(row)
 
 
-@pytest.fixture
-def campaign(tmp_path, monkeypatch):
-    monkeypatch.setattr(final, "ROOT", tmp_path)
-    directory = tmp_path / "experimentos/resultados/orquestracao/definitivos_C4_01"
+def construir_campanha(tmp_path, scenario="C4", base=2000):
+    directory = tmp_path / f"experimentos/resultados/orquestracao/definitivos_{scenario}_01"
     directory.mkdir(parents=True)
     entries = []
     for app, users in final.DEMANDAS.items():
         for u in users:
             for logical in (1, 2, 3):
-                physical = 2012 if (app, u, logical) == ("io", 2, 2) else 2000 + logical
-                job = dict(cenario="C4", aplicacao=app, usuarios=u, repeticao=physical,
-                           repeticao_logica=logical, tentativa=2 if physical == 2012 else 1)
+                recovered = (app, u, logical) == (("cpu", 10, 2) if scenario == "C3" else ("io", 2, 2))
+                physical = base + logical + (10 if recovered else 0)
+                job = dict(cenario=scenario, aplicacao=app, usuarios=u, repeticao=physical,
+                           repeticao_logica=logical, tentativa=2 if recovered else 1)
                 folder = directory / f"{app}_{u}_{physical}"
                 analysis = folder / "analise"
                 analysis.mkdir(parents=True)
-                row = dict(cenario="C4", aplicacao=app, usuarios=u, repeticao=physical,
+                row = dict(cenario=scenario, aplicacao=app, usuarios=u, repeticao=physical,
                            inicio_janela_utc="2026-10-08T12:00:00Z", fim_janela_utc="2026-10-08T12:01:00Z",
                            req_janela=60, amostras_sistema=59, avisos="Sincronização provisória | CPU global divergente")
                 for name, (field, divisor, _) in final.METRICAS.items():
@@ -48,7 +47,8 @@ def campaign(tmp_path, monkeypatch):
                 manifest.write_text(json.dumps(dict(estado="concluída", job=job, analise=str(analysis))), encoding="utf-8")
                 entries.append(dict(estado="concluída", job=job, manifesto=str(manifest)))
     failed = dict(entries[-1])
-    failed["job"] = dict(cenario="C4", aplicacao="io", usuarios=2, repeticao=2002, repeticao_logica=2, tentativa=1)
+    app, users = ("cpu", 10) if scenario == "C3" else ("io", 2)
+    failed["job"] = dict(cenario=scenario, aplicacao=app, usuarios=users, repeticao=base+2, repeticao_logica=2, tentativa=1)
     failed["estado"] = "falha"
     failed["manifesto"] = "não será lido"
     entries.append(failed)
@@ -57,6 +57,79 @@ def campaign(tmp_path, monkeypatch):
     index = directory / "indice.json"
     index.write_text(json.dumps(entries), encoding="utf-8")
     return index
+
+
+@pytest.fixture
+def campaign(tmp_path, monkeypatch):
+    monkeypatch.setattr(final, "ROOT", tmp_path)
+    return construir_campanha(tmp_path)
+
+
+@pytest.mark.parametrize("scenario,base", [("C3",3000), ("C4",2000), ("C1",1000), ("C2",5000)])
+def test_cenarios_base_inferida_recuperacao_e_textos(tmp_path, monkeypatch, scenario, base):
+    # Bases de C1/C2 são dados sintéticos legais, não atribuições às campanhas reais.
+    monkeypatch.setattr(final, "ROOT", tmp_path)
+    index = construir_campanha(tmp_path, scenario, base)
+    rows, excluded, _ = final.selecionar(index)
+    assert len(rows) == 27 and len(excluded) == 2
+    assert {r["base_repeticao"] for r in rows} == {base}
+    app, users = ("cpu",10) if scenario == "C3" else ("io",2)
+    selected = [r for r in rows if r["aplicacao"] == app and int(r["usuarios"]) == users]
+    assert [int(r["repeticao"]) for r in selected] == [base+1,base+12,base+3]
+    assert any(r["repeticao"] == base+2 and r["estado"] == "falha" for r in excluded)
+    aggregated = final.agregar(rows)
+    report = final.relatorio(rows, aggregated, excluded)
+    assert report.startswith(f"# Análise definitiva — {scenario}")
+    assert "duas vCPUs" not in report
+    if scenario != "C4": assert "C4" not in report
+
+
+@pytest.mark.parametrize("state", ["concluída", "falha"])
+def test_indice_cenarios_misturados_rejeitado(campaign, state):
+    entries = final.ler_json(campaign)
+    entries[-1]["job"]["cenario"] = "C3"
+    entries[-1]["estado"] = state
+    campaign.write_text(json.dumps(entries), encoding="utf-8")
+    with pytest.raises(ValueError, match="cenários misturados"):
+        final.selecionar(campaign)
+
+
+def test_agregacao_cenarios_misturados_rejeitada(campaign):
+    rows, _, _ = final.selecionar(campaign)
+    rows[-1]["cenario"] = "C3"
+    with pytest.raises(ValueError, match="cenários misturados"): final.agregar(rows)
+
+
+def test_c3_repeticao_ausente_rejeitada(tmp_path, monkeypatch):
+    monkeypatch.setattr(final, "ROOT", tmp_path)
+    index = construir_campanha(tmp_path, "C3", 3000)
+    entries = final.ler_json(index)
+    entries = [e for e in entries if e["job"]["repeticao"] != 3012]
+    index.write_text(json.dumps(entries), encoding="utf-8")
+    with pytest.raises(ValueError, match="três repetições válidas cpu/10"):
+        final.selecionar(index)
+
+
+def test_bases_completas_ambiguas_rejeitadas(campaign):
+    entries = final.ler_json(campaign)
+    copies = []
+    for entry in entries[:27]:
+        copies.append({**entry, "job": {**entry["job"], "repeticao": entry["job"]["repeticao"] + 1000}})
+    campaign.write_text(json.dumps(entries + copies), encoding="utf-8")
+    with pytest.raises(ValueError, match="Base da campanha ausente ou ambígua"):
+        final.selecionar(campaign)
+
+
+def test_c3_saida_padrao_e_titulos_svg(tmp_path, monkeypatch):
+    pytest.importorskip("matplotlib")
+    monkeypatch.setattr(final, "ROOT", tmp_path)
+    index = construir_campanha(tmp_path, "C3", 3000)
+    output = tmp_path / "experimentos/resultados/analise_final/C3"
+    assert final.main(["--indice",str(index)]) == 0
+    assert (output / "relatorio.md").read_text(encoding="utf-8").startswith("# Análise definitiva — C3")
+    assert "C3 · cpu" in (output / "cpu.svg").read_text(encoding="utf-8")
+    audit = final.ler_json(output / "selecao.json")
+    assert audit["cenario"] == "C3" and audit["base_repeticao"] == 3000
 
 
 def test_selecao_substituta_sem_exploratorios_e_avisos(campaign):

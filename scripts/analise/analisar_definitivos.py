@@ -1,4 +1,4 @@
-"""Estatística descritiva C4 a partir do índice e dos consolidados, sem carga."""
+"""Estatística descritiva de uma campanha C1–C4, sem carga nem mistura de cenários."""
 
 import argparse
 from collections import defaultdict
@@ -13,6 +13,7 @@ if __package__ in (None, ""):
     import sys
     sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from scripts.analise.consolidar_resultados import numero, instante
+from scripts.carga.executar_locust import SCENARIOS
 
 ROOT = Path(__file__).resolve().parents[2]
 DEMANDAS = {"cpu": (1, 2, 5, 10), "memoria": (1, 2, 3), "io": (1, 2)}
@@ -59,18 +60,55 @@ def estatistica(values):
             "minimo": min(valid) if valid else None, "maximo": max(valid) if valid else None}
 
 
+def cenario_unico(rows):
+    scenarios = {r.get("cenario") for r in rows}
+    if len(scenarios) != 1 or not scenarios <= set(SCENARIOS):
+        raise ValueError("Índice/análise exige um único cenário válido C1, C2, C3 ou C4; cenários misturados não são aceitos.")
+    return next(iter(scenarios))
+
+
+def base_job(job):
+    values = [job.get(k) for k in ("repeticao", "tentativa", "repeticao_logica")]
+    if any(type(v) is not int for v in values):
+        return None
+    physical, attempt, logical = values
+    if not 1 <= attempt <= 99 or logical not in (1, 2, 3):
+        return None
+    base = physical - 10 * (attempt - 1) - logical
+    return base if base >= 1000 and base % 1000 == 0 else None
+
+
+def base_campanha(entries, expected):
+    # O plano inclui falhas/planejadas: elas identificam a campanha, não entram
+    # nas estatísticas. Uma base exploratória parcial não substitui o plano completo.
+    plans = defaultdict(set)
+    for entry in entries:
+        job = entry["job"]
+        base = base_job(job)
+        if base is not None:
+            plans[base].add((job["aplicacao"], job["usuarios"], job["repeticao_logica"]))
+    complete = {base for base, keys in plans.items()
+                if {(app, u, r) for app, u in expected for r in (1, 2, 3)} <= keys}
+    if len(complete) == 1:
+        return complete.pop()
+    if not complete and len(plans) == 1:
+        return next(iter(plans))  # A contagem posterior explicita repetições ausentes.
+    raise ValueError("Base da campanha ausente ou ambígua; confira a numeração e o plano do índice.")
+
+
 def selecionar(indice, dispositivo="sda"):
     entries = ler_json(indice)
     if not isinstance(entries, list):
         raise ValueError("Índice deve ser uma lista.")
     rows, excluded, sources, seen = [], [], {relativo(indice): sha(indice)}, set()
     expected = {(app, u) for app, users in DEMANDAS.items() for u in users}
+    cenario_unico([e["job"] for e in entries])
+    base = base_campanha(entries, expected)
     for entry in entries:
         job = entry["job"]
         reason = None
-        if job.get("cenario") != "C4": reason = "outro cenário"
-        elif job.get("repeticao", 0) < 2000: reason = "exploratória/validação; fora da base definitiva 2000"
-        elif entry.get("estado") != "concluída": reason = "estado não concluída"
+        if entry.get("estado") != "concluída": reason = "estado não concluída"
+        elif base_job(job) != base: reason = f"numeração inconsistente ou fora da base da campanha {base}"
         if reason:
             excluded.append({**job, "estado": entry.get("estado"), "motivo": reason})
             continue
@@ -104,7 +142,7 @@ def selecionar(indice, dispositivo="sda"):
         start, end = instante(raw["inicio_janela_utc"]), instante(raw["fim_janela_utc"])
         if start >= end or (numero(raw.get("req_janela")) or 0) <= 0 or (numero(raw.get("amostras_sistema")) or 0) <= 0:
             raise ValueError(f"Sem carga/cobertura válida: {source}")
-        row = {**raw, "repeticao_logica": logical, "tentativa": job["tentativa"],
+        row = {**raw, "repeticao_logica": logical, "tentativa": job["tentativa"], "base_repeticao": base,
                "fonte_consolidado": relativo(source), "fonte_manifesto": relativo(manifest_path),
                "dispositivo_escrita": dispositivo if app == "io" else ""}
         warnings = list(dict.fromkeys((raw.get("avisos", "") + " | " + manifest.get("avisos", "")).split(" | ")))
@@ -134,6 +172,7 @@ def selecionar(indice, dispositivo="sda"):
 
 
 def agregar(rows):
+    cenario_unico(rows)
     groups = defaultdict(list)
     for row in rows:
         groups[(row["cenario"], row["aplicacao"], int(row["usuarios"]))].append(row)
@@ -164,6 +203,7 @@ def salvar_csv(path, rows):
 
 
 def graficos(rows, aggregated, directory):
+    scenario = cenario_unico(rows)
     import matplotlib
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
@@ -184,7 +224,7 @@ def graficos(rows, aggregated, directory):
                 if not available: continue
                 ax.errorbar([r["usuarios"] for r in available], [r["media"] for r in available],
                             yerr=[r["desvio_padrao_amostral"] or 0 for r in available], marker="o", capsize=4, label=label)
-            ax.set_title(f"C4 · {app} · n=3")
+            ax.set_title(f"{scenario} · {app} · n=3")
             ax.set_xticks(users)
             ax.set_xlabel("Usuários concorrentes (modelo fechado)")
             ax.set_ylabel(metrics[0][1] if len(metrics) == 1 else ("ms" if filename == "latencia" else "MiB"))
@@ -200,12 +240,17 @@ def graficos(rows, aggregated, directory):
 
 
 def relatorio(rows, aggregated, excluded):
+    scenario = cenario_unico(rows)
+    bases = {r.get("base_repeticao") for r in rows}
+    cpus = sorted({numero(r.get("cpus_logicas_observadas")) or numero(r.get("vcpus_planejado")) or SCENARIOS[scenario]["vcpus"] for r in rows})
+    retention = sorted({str(r.get("retencao_servidor_s") or "ausente") for r in rows if r["aplicacao"] == "memoria"})
     def mean(app, users, metric):
         return next(r["media"] for r in aggregated if r["aplicacao"] == app and r["usuarios"] == users and r["metrica"] == metric)
     def fmt(value): return f"{value:.3f}" if value is not None else "ausente"
-    lines = ["# Análise definitiva — C4", "", "## Seleção e método", "",
+    lines = [f"# Análise definitiva — {scenario}", "", "## Seleção e método", "",
              "27 execuções concluídas; nove combinações; três repetições lógicas (1, 2, 3) por combinação. "
-             "Seleção restrita ao índice da campanha definitiva; execuções fora da base 2000 e estados não concluídos são excluídos.", "",
+             f"Seleção restrita ao índice da campanha; base identificada nos registros: {', '.join(str(b) for b in bases)}. "
+             "Numeração segue base + 10 × (tentativa − 1) + repetição lógica. Estados não concluídos e registros fora da base são excluídos.", "",
              "As unidades independentes são as repetições, com peso igual. Média = soma dos três valores / 3; "
              "desvio-padrão amostral usa divisor n−1. Mínimo/máximo são entre repetições, não entre requisições. "
              "O p95 agregado é a média dos p95 de cada execução, não o p95 de requisições reunidas. "
@@ -229,27 +274,31 @@ def relatorio(rows, aggregated, excluded):
     lines += ["", "## Análise interpretativa", "",
               f"CPU: a vazão passa de {fmt(mean('cpu',1,'vazao_rps'))} para {fmt(mean('cpu',2,'vazao_rps'))} req/s "
               f"entre um e dois usuários. Com cinco e dez, registra {fmt(mean('cpu',5,'vazao_rps'))} e "
-              f"{fmt(mean('cpu',10,'vazao_rps'))} req/s, enquanto a latência cresce. A CPU da árvore com dois usuários "
+              f"{fmt(mean('cpu',10,'vazao_rps'))} req/s. As latências médias correspondentes são "
+              f"{fmt(mean('cpu',5,'latencia_media_ms'))} e {fmt(mean('cpu',10,'latencia_media_ms'))} ms. A CPU da árvore com dois usuários "
               f"é {fmt(mean('cpu',2,'cpu_arvore_pct'))}% da capacidade VM. Esses valores são observados; "
-              "limitação por CPU e fila são hipóteses compatíveis. A redução posterior da CPU/vazão também pode envolver "
+              "limitação por CPU e fila são hipóteses compatíveis quando alta utilização acompanha aumento de latência. Variações de CPU/vazão também podem envolver "
               "agendamento e sobrecarga; estes dados não isolam a causa nem demonstram saturação monotônica.", "",
               f"Memória: RSS médio passa de {fmt(mean('memoria',1,'rss_arvore_mib'))} a "
-              f"{fmt(mean('memoria',3,'rss_arvore_mib'))} MiB entre um e três usuários. A vazão cresce com a concorrência, "
-              "com baixa CPU. A retenção configurada de um segundo participa do tempo de resposta: serve à observação "
+              f"{fmt(mean('memoria',3,'rss_arvore_mib'))} MiB entre um e três usuários. A vazão correspondente passa de "
+              f"{fmt(mean('memoria',1,'vazao_rps'))} para {fmt(mean('memoria',3,'vazao_rps'))} req/s; CPU da árvore de "
+              f"{fmt(mean('memoria',1,'cpu_arvore_pct'))}% para {fmt(mean('memoria',3,'cpu_arvore_pct'))}%. "
+              f"Retenção declarada nos consolidados (segundos): {', '.join(retention)}. Quando habilitada, participa do tempo de resposta: serve à observação "
               "das alocações e não representa custo de acesso à RAM. Não há demonstração de esgotamento de RAM ou "
               "saturação de largura de banda da memória; o nome Memory-bound identifica o perfil implementado.", "",
               f"I/O: a vazão passa de {fmt(mean('io',1,'vazao_rps'))} para {fmt(mean('io',2,'vazao_rps'))} req/s; "
               f"latência média de {fmt(mean('io',1,'latencia_media_ms'))} para {fmt(mean('io',2,'latencia_media_ms'))} ms. "
-              "O ganho limitado e a baixa CPU são compatíveis com espera por I/O/sincronização, mas não comprovam "
+              f"CPU da árvore passa de {fmt(mean('io',1,'cpu_arvore_pct'))}% para {fmt(mean('io',2,'cpu_arvore_pct'))}%. "
+              "Se o ganho de vazão for limitado com baixa CPU, espera por I/O/sincronização é uma hipótese, mas esses valores não comprovam "
               "saturação do disco físico do Windows. Cache, fsync, disco virtual e outras atividades podem influenciar. "
               "Os contadores são do dispositivo da VM inteira; escrita lógica de arquivos não equivale a escrita física no host.", "",
               "## Limitações e avisos metodológicos", "",
               "CPU da árvore é soma dos percentuais dos processos dividida pelas CPUs lógicas; "
-              "100% representa a capacidade das duas vCPUs. CPU global permanece separada, sem reconciliar contadores inconsistentes. "
+              f"100% representa a capacidade total da VM; CPUs lógicas observadas/declaradas: {', '.join(f'{c:g}' for c in cpus)}. CPU global permanece separada, sem reconciliar contadores inconsistentes. "
               "Médias de recursos são as médias amostradas que o consolidado fornece na janela útil.", "",
               "Soma RSS pode contar páginas compartilhadas mais de uma vez; não é memória privada. "
               "USS mede páginas privadas e PSS rateia páginas compartilhadas. RAM usada é do sistema inteiro. "
-              "Picos são amostrados e podem perder eventos entre coletas. USS/PSS da CPU estão ausentes, não são zero.", "",
+              "Picos são amostrados e podem perder eventos entre coletas. USS/PSS ausentes são explicitados por métrica e execução, não são zero.", "",
               "Correção de relógios já aplicada pelo consolidador: UTC Windows = UTC Linux − offset (Linux menos Windows). "
               "Não se aplica correção novamente. Sondagens não comprovam sincronização perfeita nem eliminam deriva. "
               "Avisos originais são preservados por execução em avisos.csv e nos dados individuais.", "",
@@ -257,8 +306,8 @@ def relatorio(rows, aggregated, excluded):
               "A média de escrita é a média das taxas das amostras já consolidadas; total de bytes e operações cobre "
               "os intervalos selecionados, não necessariamente todos os limites UTC da carga. Não se atribui toda atividade à API.", "",
               "Três repetições permitem descrição da variabilidade, não conclusões causais ou testes de significância. "
-              "C4 sozinho não demonstra efeito do provisionamento comparado a C1–C3. A segunda tentativa usa "
-              "instrumentação corrigida; isso deve ser considerado na comparação com execuções anteriores.", "",
+              f"{scenario} sozinho não demonstra efeito do provisionamento comparado a outros cenários. Tentativas de recuperação "
+              "podem envolver instrumentação revisada; confira os metadados antes de comparar execuções.", "",
               "## Auditoria de seleção", ""]
     for row in rows:
         lines.append(f"- {row['aplicacao']}/{row['usuarios']}: lógica {row['repeticao_logica']}, "
@@ -274,14 +323,17 @@ def relatorio(rows, aggregated, excluded):
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--indice", type=Path, default=ROOT / "experimentos/resultados/orquestracao/definitivos_C4_01/indice.json")
-    parser.add_argument("--saida", type=Path, default=ROOT / "experimentos/resultados/analise_final/C4")
+    parser.add_argument("--saida", type=Path, help="Pasta nova; padrão analise_final/<cenário identificado>.")
     parser.add_argument("--dispositivo", default="sda", help="Um dispositivo apenas; nunca soma discos e partições.")
     args = parser.parse_args(argv)
     try:
+        rows, excluded, sources = selecionar(args.indice, args.dispositivo)
+        scenario = cenario_unico(rows)
+        if args.saida is None:
+            args.saida = ROOT / "experimentos/resultados/analise_final" / scenario
         relativo(args.saida)
         if not args.saida.resolve().is_relative_to((ROOT / "experimentos/resultados/analise_final").resolve()):
             raise ValueError("Saída deve ficar em analise_final, separada dos originais.")
-        rows, excluded, sources = selecionar(args.indice, args.dispositivo)
         aggregated = agregar(rows)
         import matplotlib  # Verifica dependência antes de criar a saída.
         args.saida.mkdir(parents=True, exist_ok=False)
@@ -291,7 +343,8 @@ def main(argv=None):
                      "repeticao": r["repeticao"], "aviso": w} for r in rows for w in r["avisos"].split(" | ") if w]
         salvar_csv(args.saida / "avisos.csv", warnings)
         (args.saida / "selecao.json").write_text(json.dumps({"criado_utc": datetime.now(timezone.utc).isoformat(),
-            "indice": relativo(args.indice), "fontes_sha256": sources, "dispositivo": args.dispositivo,
+            "indice": relativo(args.indice), "cenario": scenario, "base_repeticao": rows[0]["base_repeticao"],
+            "fontes_sha256": sources, "dispositivo": args.dispositivo,
             "matplotlib": matplotlib.__version__, "selecionadas": len(rows), "excluidas": excluded}, ensure_ascii=False, indent=2), encoding="utf-8")
         graficos(rows, aggregated, args.saida)
         (args.saida / "relatorio.md").write_text(relatorio(rows, aggregated, excluded), encoding="utf-8")
