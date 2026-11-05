@@ -1,0 +1,43 @@
+name: poi-atividade4
+
+services:
+  cpu:
+    build:
+      context: .
+      dockerfile: apps/cpu_bound/Dockerfile
+    image: ${DOCKERHUB_USER:-poi-local}/poi-cpu:atividade4
+    ports:
+      - "${POI_BIND_IP:-127.0.0.1}:${POI_CPU_PORT:-28001}:8001"
+    environment:
+      CPU_LIMITE_MAX: "1000000"
+    restart: unless-stopped
+
+  memory:
+    build:
+      context: .
+      dockerfile: apps/memory_bound/Dockerfile
+    image: ${DOCKERHUB_USER:-poi-local}/poi-memory:atividade4
+    ports:
+      - "${POI_BIND_IP:-127.0.0.1}:${POI_MEMORY_PORT:-28002}:8002"
+    environment:
+      MEMORY_RETENCAO_SEGUNDOS: "1"
+      MEMORY_LIMITE_MAX_MB: "64"
+      MEMORY_MAX_SIMULTANEAS: "4"
+    restart: unless-stopped
+
+  io:
+    build:
+      context: .
+      dockerfile: apps/io_bound/Dockerfile
+    image: ${DOCKERHUB_USER:-poi-local}/poi-io:atividade4
+    ports:
+      - "${POI_BIND_IP:-127.0.0.1}:${POI_IO_PORT:-28003}:8003"
+    environment:
+      IO_DIRETORIO_TEMP: "/dados/io-temporarios"
+      IO_FSYNC: "1"
+      IO_TAMANHO_MAX_MB: "32"
+      IO_OPERACOES_MAX: "5"
+      IO_MAX_SIMULTANEAS: "2"
+    volumes:
+      - "${POI_DATA_DIR:-./docker-dados}/io-temporarios:/dados/io-temporarios"
+    restart: unless-stopped
